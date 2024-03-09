@@ -20,14 +20,20 @@ logging_channel_id = 1094781943633154149
 logging_enabled = True  # Set initial logging status to enabled
 
 # Function: Log events to the specified logging channel
-async def log(ctx, message):
+async def log(ctx, action, message):
     global logging_enabled
     if logging_enabled:
         log_channel = bot.get_channel(logging_channel_id)
-        await log_channel.send(message)
+        user_display_name = ctx.user.display_name if isinstance(ctx, nextcord.Interaction) else ctx.user.display_name
+        log_message = f'{user_display_name} | {message}'  # Include action and user's display name
+        await log_channel.send(log_message)
 
 # Dictionary to store warns for each member
 warns = {}
+
+# Global variables to store warn threshold and punishment settings
+warn_threshold = 3
+punishment_action = "mute"  # Default punishment action
 
 class ApplicationCommandOptionType(Enum):
     STRING = 3
@@ -37,6 +43,32 @@ class ApplicationCommandOptionType(Enum):
 async def on_ready():
     print(f'{bot.user} is now online')
     await bot.change_presence(status=nextcord.Status.do_not_disturb)
+    
+# Logic to enforce punishments when the warn threshold is crossed or met
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandInvokeError):
+        original_error = error.original
+        if isinstance(original_error, nextcord.Forbidden):
+            # If the bot lacks permissions to perform an action, handle the error gracefully
+            await ctx.send("I do not have permission to perform that action.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("Missing required argument.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("Bad argument provided.")
+    else:
+        await ctx.send("An error occurred while processing the command.")
+
+@bot.event
+async def on_member_join(member):
+    if member.id in warns and len(warns[member.id]) >= warn_threshold:
+        if punishment_action == "mute":
+            # Implement mute logic
+            pass
+        elif punishment_action == "kick":
+            await member.kick(reason="Crossed warn threshold.")
+        elif punishment_action == "ban":
+            await member.ban(reason="Crossed warn threshold.")
 
 # Command: Ban a member
 @bot.slash_command(description="Ban a member from the server.")
@@ -51,7 +83,7 @@ async def ban(ctx, member: nextcord.Member, *, reason=None):
         log_message = f'{member.mention} has been banned.'
 
     await ctx.send(response)
-    await log(ctx, log_message)
+    await log(ctx, "Ban", log_message)
 
 # Command: Unban a member
 @bot.slash_command(description="Unban a member from the server.")
@@ -66,7 +98,7 @@ async def unban(ctx, *, member):
         if (user.name, user.discriminator) == (member_name, member_discriminator):
             await ctx.guild.unban(user)
             await ctx.send(f'{user.mention} has been unbanned.')
-            await log(ctx, f'{user.mention} has been unbanned.')
+            await log(ctx, "Unban", f'{user.mention} has been unbanned.')
             return
 
 # Command: Kick a member
@@ -82,7 +114,7 @@ async def kick(ctx, member: nextcord.Member, *, reason=None):
         log_message = f'{member.mention} has been kicked.'
 
     await ctx.send(response)
-    await log(ctx, log_message)
+    await log(ctx, "Kick", log_message)
 
 # Command: Warn a member
 @bot.slash_command(description="Warn a member.")
@@ -97,7 +129,7 @@ async def warn(ctx, member: nextcord.Member, *, reason: str):
 
     # Send a confirmation message
     await ctx.send(f'{member.mention} has been warned for {reason}.')
-    await log(ctx, f'{member.mention} has been warned for {reason}.')
+    await log(ctx, "Warn", f'{member.mention} has been warned for {reason}.')
 
 # Command: View warns for a member
 @bot.slash_command(description="View warns for a member.")
@@ -118,10 +150,31 @@ async def clearwarnings(ctx, member: nextcord.Member):
         # Clear the warns for the member
         del warns[member.id]
         await ctx.send(f'Warns cleared for {member.mention}.')
-        await log(ctx, f'Warns cleared for {member.mention}.')
+        await log(ctx, "Clear Warns", f'Warns cleared for {member.mention}.')
     else:
         await ctx.send(f'{member.mention} has no warns.')
-  
+        
+# Command: Set warn threshold
+@bot.slash_command(description="Set the warn threshold.")
+async def setwarnthreshold(ctx, threshold: int):
+    """Set the warn threshold."""
+    global warn_threshold
+    warn_threshold = threshold
+    await ctx.send(f"Warn threshold set to {threshold}.")
+
+# Command: Set punishment for crossing or meeting the warn threshold
+@bot.slash_command(description="Set the punishment for crossing/meeting the warn threshold. Options: mute, kick, ban")
+async def setwarnpunishment(ctx, action: str):
+    """Set the punishment for crossing/meeting the warn threshold."""
+    global punishment_action
+    # Validate the provided action (e.g., "mute", "kick", "ban")
+    valid_actions = ["mute", "kick", "ban"]
+    if action.lower() in valid_actions:
+        punishment_action = action.lower()
+        await ctx.send(f"Punishment for crossing/meeting the warn threshold set to {action}.")
+    else:
+        await ctx.send("Invalid punishment action. Available actions: mute, kick, ban.")
+
 # Command: Mute a member
 @bot.slash_command(description="Mute a member to prevent them from sending messages.")
 async def mute(ctx, member: nextcord.Member):
@@ -138,24 +191,46 @@ async def mute(ctx, member: nextcord.Member):
 
     await member.add_roles(role)
     await ctx.send(f'{member.mention} has been muted.')
-    await log(ctx, f'{member.mention} has been muted.')
+    await log(ctx, "Mute", f'{member.mention} has been muted.')
 
 # Command: Lock a channel
 @bot.slash_command(description="Lock a channel to prevent members from sending messages.")
 async def lock(ctx):
     """Lock a channel to prevent members from sending messages."""
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
+    # Get the @everyone role
+    everyone_role = ctx.guild.default_role
+
+    # Get the channel's permissions for @everyone
+    channel_permissions = ctx.channel.overwrites_for(everyone_role)
+
+    # Set the send_messages permission to False while preserving other permissions
+    channel_permissions.send_messages = False
+
+    # Apply the updated permissions to the channel
+    await ctx.channel.set_permissions(everyone_role, overwrite=channel_permissions)
+
     await ctx.send('This channel has been locked.')
-    await log(ctx, f'{ctx.channel.mention} has been locked.')
+    await log(ctx, "Lock", f'{ctx.channel.mention} has been locked.')
 
 # Command: Unlock a channel
 @bot.slash_command(description="Unlock a previously locked channel.")
 async def unlock(ctx):
     """Unlock a previously locked channel."""
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
+    # Get the @everyone role
+    everyone_role = ctx.guild.default_role
+
+    # Get the channel's current permissions for @everyone
+    channel_permissions = ctx.channel.overwrites_for(everyone_role)
+
+    # Update the send_messages permission to True while preserving other permissions
+    channel_permissions.send_messages = True
+
+    # Apply the updated permissions to the channel
+    await ctx.channel.set_permissions(everyone_role, overwrite=channel_permissions)
+
     await ctx.send('This channel has been unlocked.')
-    await log(ctx, f'{ctx.channel.mention} has been unlocked.')
-    
+    await log(ctx, "Unlock", f'{ctx.channel.mention} has been unlocked.')
+
 # Command: Purge messages from a channel
 @bot.slash_command(description="Purge messages from a channel.")
 async def purge(ctx, amount: int, member: nextcord.Member = None):
@@ -165,12 +240,12 @@ async def purge(ctx, amount: int, member: nextcord.Member = None):
         check = lambda m: m.author == member
         deleted = await ctx.channel.purge(limit=amount, check=check)
         await ctx.send(f'{len(deleted)} messages from {member.mention} have been purged from the channel.')
-        await log(ctx, f'{len(deleted)} messages from {member.mention} have been purged from {ctx.channel.mention}.')
+        await log(ctx, "Purge", f'{len(deleted)} messages from {member.mention} have been purged from {ctx.channel.mention}.')
     else:
         # Purge messages without specifying a member
         deleted = await ctx.channel.purge(limit=amount + 1)
         await ctx.send(f'{len(deleted) - 1} messages have been purged from the channel.')
-        await log(ctx, f'{len(deleted) - 1} messages have been purged from {ctx.channel.mention}.')
+        await log(ctx, "Purge", f'{len(deleted) - 1} messages have been purged from {ctx.channel.mention}.')
 
 # Command: Add role to a member
 @bot.slash_command(description="Add a role to a member.")
@@ -178,7 +253,7 @@ async def addrole(ctx, member: nextcord.Member, role: nextcord.Role):
     """Add a role to a member."""
     await member.add_roles(role)
     await ctx.send(f'{member.mention} has been given the {role.name} role.')
-    await log(ctx, f'{member.mention} has been given the {role.name} role.')
+    await log(ctx, "Add Role", f'{member.mention} has been given the {role.name} role.')
 
 # Command: Remove role from a member
 @bot.slash_command(description="Remove a role from a member.")
@@ -186,7 +261,7 @@ async def removerole(ctx, member: nextcord.Member, role: nextcord.Role):
     """Remove a role from a member."""
     await member.remove_roles(role)
     await ctx.send(f'{member.mention} no longer has the {role.name} role.')
-    await log(ctx, f'{member.mention} no longer has the {role.name} role.')
+    await log(ctx, "Remove Role", f'{member.mention} no longer has the {role.name} role.')
 
 # Command: Set Logging Channel and Toggle Logging
 @bot.slash_command(description="Set or toggle the logging channel.")
@@ -243,35 +318,55 @@ async def poll(ctx, question: str, *options: str):
 
     # Send the poll message
     poll_embed = nextcord.Embed(title="Poll", description=poll_message, color=nextcord.Color.blue())
-    poll_embed.set_footer(text=f"Poll created by {ctx.author.display_name}")
+    poll_embed.set_footer(text=f"Poll created by {ctx.user.display_name}")
     poll_message = await ctx.send(embed=poll_embed)
 
     # Add reactions to the poll message for each option
     for i in range(len(options)):
         await poll_message.add_reaction(chr(0x1F1E6 + i))
 
-    await log(ctx, f"Poll created by {ctx.author.display_name}")
+    await log(ctx, "Create Poll", f"Poll created by {ctx.user.display_name}")
+
+# Command: Server Information
+@bot.slash_command(description="Display server information.")
+async def serverinfo(ctx):
+    """Display summary server information."""
+    # Retrieve and format summary information about the server
+    summary_info = f"Server Name: {ctx.guild.name}\n"
+    summary_info += f"Server Creation Date: {ctx.guild.created_at.strftime('%B %d, %Y')}\n"
+    summary_info += f"Total Members: {ctx.guild.member_count}\n"
+
+    # Get the invite link
+    invite_link = "https://discord.com/invite/WaTFrzaYxk"
+    summary_info += f"Invite Link: {invite_link}\n"
+
+    await ctx.send(summary_info)
 
 # Command: Help - Show all available commands
 @bot.slash_command(description="Show all available commands.")
-async def commandhelp(ctx):
+async def help(ctx):
     """Show all available commands."""
     help_message = (
         "**Available commands:**\n\n"
-        "**/kick**: Kick a member from the server.\n"
         "**/ban**: Ban a member from the server.\n"
         "**/unban**: Unban a member from the server.\n"
+        "**/kick**: Kick a member from the server.\n"
+        "**/warn**: Warn a member.\n"
+        "**/clearwarnings**: Clear warns for a member.\n"
+        "**/warns**: View warns for a member.\n"
+        "**/setwarnthreshold**: Set the warn threshold.\n"  # Add the new command
+        "**/setwarnpunishment**: Set the punishment for crossing/meeting the warn threshold.\n"  # Add the new command
+        "**/mute**: Mute a member to prevent them from sending messages.\n"
         "**/lock**: Lock a channel to prevent members from sending messages.\n"
         "**/unlock**: Unlock a previously locked channel.\n"
-        "**/mute**: Mute a member to prevent them from sending messages.\n"
+        "**/purge**: Purge messages from a channel.\n"
         "**/addrole**: Add a role to a member.\n"
         "**/removerole**: Remove a role from a member.\n"
-        "**/purge**: Purge messages from a channel.\n"
-        "**/warn**: Warn a member.\n"
         "**/logging**: Set or toggle the logging channel.\n"
         "**/announce**: Make an announcement.\n"
         "**/poll**: Create a poll.\n"
-        "**/commandhelp**: Show all available commands.\n"
+        "**/serverinfo**: Display server information.\n"
+        "**/help**: Show all available commands.\n"
     )
     await ctx.send(help_message)
 
