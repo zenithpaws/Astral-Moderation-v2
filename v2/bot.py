@@ -1,16 +1,13 @@
-import discord
-import discord.ext
-from discord.ext import commands
-import nextcord  # noqa: F401
-from nextcord import SlashOption  # noqa: F401
+import nextcord
+from nextcord.ext import commands
 from enum import Enum
 
 # Set your bot's prefix
 prefix = "/"
 
 # Create a bot instance with a command prefix
-intents = discord.Intents.default()
-intents = discord.Intents().all()
+intents = nextcord.Intents.default()
+intents = nextcord.Intents.all()
 intents.messages = True
 intents.message_content = True  # Enable MESSAGE_CONTENT intent
 bot = commands.Bot(command_prefix=prefix, intents=intents)
@@ -39,7 +36,7 @@ class ApplicationCommandOptionType(Enum):
 @bot.event
 async def on_ready():
     print(f'{bot.user} is now online')
-    await bot.change_presence(status=discord.Status.do_not_disturb)
+    await bot.change_presence(status=nextcord.Status.do_not_disturb)
 
 # Command: Ban a member
 @bot.slash_command(description="Ban a member from the server.")
@@ -129,7 +126,7 @@ async def clearwarnings(ctx, member: nextcord.Member):
 @bot.slash_command(description="Mute a member to prevent them from sending messages.")
 async def mute(ctx, member: nextcord.Member):
     """Mute a member to prevent them from sending messages."""
-    role = discord.utils.get(ctx.guild.roles, name="Muted")
+    role = nextcord.utils.get(ctx.guild.roles, name="Muted")
 
     if not role:
         # Create a Muted role if it doesn't exist
@@ -177,7 +174,7 @@ async def purge(ctx, amount: int, member: nextcord.Member = None):
 
 # Command: Add role to a member
 @bot.slash_command(description="Add a role to a member.")
-async def addrole(ctx, member: discord.Member, role: discord.Role):
+async def addrole(ctx, member: nextcord.Member, role: nextcord.Role):
     """Add a role to a member."""
     await member.add_roles(role)
     await ctx.send(f'{member.mention} has been given the {role.name} role.')
@@ -185,7 +182,7 @@ async def addrole(ctx, member: discord.Member, role: discord.Role):
 
 # Command: Remove role from a member
 @bot.slash_command(description="Remove a role from a member.")
-async def removerole(ctx, member: discord.Member, role: discord.Role):
+async def removerole(ctx, member: nextcord.Member, role: nextcord.Role):
     """Remove a role from a member."""
     await member.remove_roles(role)
     await ctx.send(f'{member.mention} no longer has the {role.name} role.')
@@ -245,7 +242,7 @@ async def poll(ctx, question: str, *options: str):
         poll_message += f"{idx}. {option}\n"
 
     # Send the poll message
-    poll_embed = discord.Embed(title="Poll", description=poll_message, color=discord.Color.blue())
+    poll_embed = nextcord.Embed(title="Poll", description=poll_message, color=nextcord.Color.blue())
     poll_embed.set_footer(text=f"Poll created by {ctx.author.display_name}")
     poll_message = await ctx.send(embed=poll_embed)
 
