@@ -14,7 +14,7 @@ intents.message_content = True  # Enable MESSAGE_CONTENT intent
 bot = commands.Bot(command_prefix=prefix, intents=intents)
 
 # Initialize Firebase
-cred = credentials.Certificate("ryzen-moderation-firebase-adminsdk.json")
+cred = credentials.Certificate(".ryzen-moderation-firebase-adminsdk.json")
 firebase_admin.initialize_app(cred)
 
 # Initialize Firestore
@@ -91,14 +91,28 @@ async def commandpermissions(ctx):
     await ctx.send("You do not have permission to use this command.")
     return False
 
-# Function to get the bot token from Firestore
-async def get_bot_token():
-    bot_token_ref = db.collection("secrets").document("bot_token")
-    snapshot = await bot_token_ref.get()  # Await the asynchronous operation
+# Function to get the GitHub personal access token from Firestore
+async def get_pat():
+    pat_ref = db.collection("secrets").document("github_personal_access_token")
+    snapshot = await pat_ref.get()  # Await the asynchronous operation
     if snapshot.exists:
-        return snapshot.to_dict().get("value")
+        return snapshot.to_dict().get("token")
     else:
-        raise ValueError("Bot token not found in Firestore.")
+        raise ValueError("GitHub personal access token not found in Firestore.")
+
+# Variable for GitHub API calls
+repoowner = 'zenithpaws'
+reponame = 'Ryzen-Moderation'
+secretname = 'BOT_TOKEN'
+
+# Make a GET request to retrieve the secret
+url = f'https://api.github.com/repos/{repoowner}/{reponame}/actions/secrets/{secretname}'
+response = requests.get(url, headers=headers)
+
+if response.status_code == 200:
+    token = response.json()['secret']
+else:
+    print(f"Failed to retrieve secret: {response.status_code}")
 
 # Function to retrieve command configuration from Firestore
 async def get_command_config():
@@ -127,7 +141,7 @@ async def get_warn_count(member_id):
 async def get_server_invite(ctx):
     """Get the server invite link from Firestore."""
     try:
-        invite_ref = db.collection("secrets").document("server-invite")
+        invite_ref = db.collection("secrets").document("server_invite")
         snapshot = invite_ref.get()
         if snapshot.exists:
             return snapshot.to_dict().get("pawers-smp")
@@ -140,7 +154,7 @@ async def get_server_invite(ctx):
 async def set_server_invite(invite_data):
     """Set the server invite link in Firestore."""
     try:
-        invite_ref = db.collection("secrets").document("server-invite")
+        invite_ref = db.collection("secrets").document("server_invite")
         invite_ref.set({"pawers-smp": invite_data})
     except Exception as e:
         print(f"Error setting server invite: {e}")
@@ -151,7 +165,7 @@ async def log_events(ctx, message):
     if log_channel_id:
         log_channel = bot.get_channel(int(log_channel_id))
         if log_channel:
-            log_message = f'<@{ctx.user.id}> {message}'  # Include user's display name, action, and channel name
+            log_message = f'Executed: <@{ctx.user.id}> | {message}'  # Include user's display name, action, and channel name
             await log_channel.send(log_message)
         else:
             print("Error: Log channel not found")
@@ -357,13 +371,18 @@ async def logging(ctx, channel: nextcord.TextChannel = None, toggle: bool = None
 
 # Command: Make an announcement.
 @bot.slash_command(description="Make an announcement.")
-async def announce(ctx, message: str):
+async def announce(ctx, message: str, ping_everyone: bool = False):
     """Make an announcement."""
     if await commandpermissions(ctx):
-        announcement_channel_id = await get_setting("announcement_channel_id")
+        announcement_channel_id = await get_channel_id("setannouncementchannel", "announcements")
         if announcement_channel_id:
             announcement_channel = bot.get_channel(int(announcement_channel_id))
-            await announcement_channel.send(message)
+            if ping_everyone:
+                await announcement_channel.send("@everyone " + message)
+                await ctx.send("Announcement made successfully")
+            else:
+                await announcement_channel.send(message)
+                await ctx.send("Announcement made successfully")
         else:
             await ctx.send("Announcement channel is not set. Use /setannouncementchannel command to set it.")
 
@@ -372,7 +391,7 @@ async def announce(ctx, message: str):
 async def setannouncementchannel(ctx, channel: nextcord.TextChannel):
     """Set the announcement channel."""
     if await commandpermissions(ctx):
-        await set_channel_id("announcement_channel", channel.name, channel.id)
+        await set_channel_id("setannouncementchannel", channel.name, channel.id)
         await ctx.send(f"Announcement channel set to {channel.mention}.")
 
 # Command: Get server invite link
@@ -398,29 +417,37 @@ async def setinvite(ctx, invite: str):
 async def help(ctx):
     """Show help information."""
     await ctx.send(
-"""**Available Commands**
+"""**Moderation Commands:**
+- `ban` | Ban a member from the server.
+- `unban` | Unban a member from the server.
+- `kick` | Kick a member from the server.
+- `warn` | Warn a member.
+- `serverwarns` | View all warnings for the server.
+- `warns` | View warns for a member.
+- `clearwarnings` | Clear warns for a member.
+- `mute` | Mute a member to prevent them from sending messages.
+- `unmute` | Unmute a member to allow them to send messages again.
+- `lock` | Lock a channel to prevent members from sending messages.
+- `unlock` | Unlock a previously locked channel.
+- `announce` | Make an announcement.
 
-**/ban** - Ban a member from the server.
-**/unban** - Unban a member from the server.
-**/kick** - Kick a member from the server.
-**/warn** - Warn a member.
-**/serverwarns** - View all warnings for the server.
-**/warns** - View warns for a member.
-**/clearwarnings** - Clear warns for a member.
-**/setwarnthreshold** - Set the warn threshold.
-**/setwarnpunishment** - Set the punishment for crossing/meeting the warn threshold.
-**/mute** - Mute a member to prevent them from sending messages.
-**/unmute** - Unmute a member to allow them to send messages again.
-**/lock** - Lock a channel to prevent members from sending messages.
-**/unlock** - Unlock a previously locked channel.
-**/purge** - Purge messages from a channel.
-**/addrole** - Add a role to a member.
-**/removerole** - Remove a role from a member.
-**/logging** - Set or toggle the logging channel.
-**/announce** - Make an announcement.
-**/setannouncementchannel** - Set the announcement channel.
-**/invite** - Get server invite link.
-**/setinvite** - Set the server invite link.""")
-    
+**Settings and Configuration Commands**
+- `setwarnthreshold` | Set the warn threshold.
+- `setwarnpunishment` | Set the punishment for crossing/meeting the warn threshold.
+- `logging` | Set or toggle the logging channel.
+- `setannouncementchannel` | Set the announcement channel.
+- `setinvite` | Set the server invite link.
+
+**Role Management Commands:**
+- `addrole` | Add a role to a member.
+- `removerole` | Remove a role from a member.
+
+**Utility Commands:**
+- `purge` | Purge messages from a channel.
+- `invite` | Get server invite link.
+
+**General Commands:**
+- `help` | Show help information.""")
+
 # Start the bot
-bot.run("OTk3MjA2MTE2ODYzODUyNzA2.GSiZpf.mGbHqB7OKgdn3qyNJWj09umv8lDwamKqIgxG7c")
+bot.run(token)

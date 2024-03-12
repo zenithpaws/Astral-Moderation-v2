@@ -14,7 +14,7 @@ intents.message_content = True  # Enable MESSAGE_CONTENT intent
 bot = commands.Bot(command_prefix=prefix, intents=intents)
 
 # Initialize Firebase
-cred = credentials.Certificate("ryzen-moderation-firebase-adminsdk.json")
+cred = credentials.Certificate(".ryzen-moderation-firebase-adminsdk.json")
 firebase_admin.initialize_app(cred)
 
 # Initialize Firestore
@@ -151,7 +151,7 @@ async def log_events(ctx, message):
     if log_channel_id:
         log_channel = bot.get_channel(int(log_channel_id))
         if log_channel:
-            log_message = f'<@{ctx.user.id}> {message}'  # Include user's display name, action, and channel name
+            log_message = f'Executed: <@{ctx.user.id}> | {message}'  # Include user's display name, action, and channel name
             await log_channel.send(log_message)
         else:
             print("Error: Log channel not found")
