@@ -1,5 +1,6 @@
 import nextcord
 import firebase_admin
+import requests
 from nextcord.ext import commands
 from firebase_admin import credentials, firestore
 from enum import Enum
@@ -19,6 +20,62 @@ firebase_admin.initialize_app(cred)
 
 # Initialize Firestore
 db = firestore.client()
+
+def get_pat_token():
+    # Assuming the personal access token is stored in a document named 'pat_token'
+    token_ref = db.collection("secrets").document("pat_token")
+    token_doc = token_ref.get()
+    if token_doc.exists:
+        return token_doc.to_dict().get("token")
+    else:
+        return None
+
+def get_pat(pat_token):
+    # GitHub repository secret name
+    secret_name = "BOT_TOKEN"
+
+    # GitHub repository owner and name
+    owner = "zenithpaws"
+    repo = "Ryzen-Moderation"
+
+    # GitHub API endpoint to get repository secrets
+    url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/{secret_name}"
+
+    # GitHub API headers with the personal access token
+    headers = {
+        "Authorization": f"token {pat_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    # Make a GET request to the GitHub API
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json().get("value")
+    else:
+        return None
+
+def store_secret(secret):
+    # Store the secret for later use in the code
+    # You can implement the storage mechanism based on your requirements
+    # For simplicity, let's just print the secret
+    print("GitHub Secret (bot_token):", secret)
+
+def retrieved_token():
+    # Get the personal access token from Firebase
+    token = get_pat_token()
+    if token:
+        # Get the repository secret from GitHub using the personal access token
+        secret = get_pat(token)
+        if secret:
+            # Store the secret for later use
+            store_secret(secret)
+        else:
+            print("Failed to retrieve GitHub secret.")
+    else:
+        print("Failed to retrieve Firebase personal access token.")
+
+if __name__ == "retrieved_token":
+    retrieved_token()
 
 async def get_setting(setting_name):
     setting_ref = db.collection("command_configuration").document(setting_name)
@@ -91,29 +148,6 @@ async def commandpermissions(ctx):
     await ctx.send("You do not have permission to use this command.")
     return False
 
-# Function to get the GitHub personal access token from Firestore
-async def get_pat():
-    pat_ref = db.collection("secrets").document("github_personal_access_token")
-    snapshot = await pat_ref.get()  # Await the asynchronous operation
-    if snapshot.exists:
-        return snapshot.to_dict().get("token")
-    else:
-        raise ValueError("GitHub personal access token not found in Firestore.")
-
-# Variable for GitHub API calls
-repoowner = 'zenithpaws'
-reponame = 'Ryzen-Moderation'
-secretname = 'BOT_TOKEN'
-
-# Make a GET request to retrieve the secret
-url = f'https://api.github.com/repos/{repoowner}/{reponame}/actions/secrets/{secretname}'
-response = requests.get(url, headers=headers)
-
-if response.status_code == 200:
-    token = response.json()['secret']
-else:
-    print(f"Failed to retrieve secret: {response.status_code}")
-
 # Function to retrieve command configuration from Firestore
 async def get_command_config():
     settings_ref = db.collection("command_configuration").document("command_config")
@@ -171,6 +205,24 @@ async def log_events(ctx, message):
             print("Error: Log channel not found")
     else:
         print("Error: Logging channel ID not set")
+
+def get_bot_token():
+    # Assuming the personal access token is stored in a document named 'bot_token'
+    token_ref = db.collection("secrets").document("bot_token")
+    token_doc = token_ref.get()
+    if token_doc.exists:
+        return token_doc.to_dict().get("token")
+    else:
+        return None
+
+def run_bot():
+    # Get the personal access token from Firestore
+    token = get_bot_token()
+    if token:
+        # Initialize the bot with the token
+        bot.run(token)
+    else:
+        print("Failed to retrieve Firebase personal access token.")
 
 class ApplicationCommandOptionType(Enum):
     STRING = 3
@@ -449,5 +501,6 @@ async def help(ctx):
 **General Commands:**
 - `help` | Show help information.""")
 
-# Start the bot
-bot.run(token)
+# Call the run_bot function to start the bot
+if __name__ == "__main__":
+    run_bot()
