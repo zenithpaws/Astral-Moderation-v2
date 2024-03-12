@@ -15,7 +15,7 @@ intents.message_content = True  # Enable MESSAGE_CONTENT intent
 bot = commands.Bot(command_prefix=prefix, intents=intents)
 
 # Initialize Firebase
-cred = credentials.Certificate(".ryzen-moderation-firebase-adminsdk.json")
+cred = credentials.Certificate("firebase.json")
 firebase_admin.initialize_app(cred)
 
 # Initialize Firestore
