@@ -1,6 +1,6 @@
 # Discord Moderation Bot
 
-This is a Discord moderation bot built using Nextcord (formerly known as discord.py) and Firebase Firestore for data storage.
+This is a Discord moderation bot built using [nextcord](https://nextcord.dev/) (formerly known as discord.py) and [Cloud Firestore](https://firebase.google.com/products/firestore) for data storage.
 
 ## Features
 
@@ -22,7 +22,7 @@ This is a Discord moderation bot built using Nextcord (formerly known as discord
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/zenithpaws/discord-moderation-bot.git
+   git clone https://github.com/zenithpaws/Ryzen-Moderation-v2
    ```
 
 2. Install the required Python packages:
@@ -31,7 +31,7 @@ This is a Discord moderation bot built using Nextcord (formerly known as discord
    pip install -r requirements.txt
    ```
 
-3. Obtain Firebase service account credentials and save them as `.ryzen-moderation-firebase-adminsdk.json` in the root directory.
+3. [Setup a Firebase account](https://console.firebase.google.com/project/_/firestore/data) and save them as `firebase.json` in the root directory.
 
 4. Set up your Discord bot token and other secrets in Firebase Firestore.
 
