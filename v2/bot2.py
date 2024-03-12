@@ -1,5 +1,6 @@
 import nextcord
 import firebase_admin
+import requests
 from nextcord.ext import commands
 from firebase_admin import credentials, firestore
 from enum import Enum
@@ -14,11 +15,67 @@ intents.message_content = True  # Enable MESSAGE_CONTENT intent
 bot = commands.Bot(command_prefix=prefix, intents=intents)
 
 # Initialize Firebase
-cred = credentials.Certificate("ryzen-moderation-firebase-adminsdk.json")
+cred = credentials.Certificate(".ryzen-moderation-firebase-adminsdk.json")
 firebase_admin.initialize_app(cred)
 
 # Initialize Firestore
 db = firestore.client()
+
+def get_pat_token():
+    # Assuming the personal access token is stored in a document named 'pat_token'
+    token_ref = db.collection("secrets").document("pat_token")
+    token_doc = token_ref.get()
+    if token_doc.exists:
+        return token_doc.to_dict().get("token")
+    else:
+        return None
+
+def get_pat(pat_token):
+    # GitHub repository secret name
+    secret_name = "BOT_TOKEN"
+
+    # GitHub repository owner and name
+    owner = "zenithpaws"
+    repo = "Ryzen-Moderation"
+
+    # GitHub API endpoint to get repository secrets
+    url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/{secret_name}"
+
+    # GitHub API headers with the personal access token
+    headers = {
+        "Authorization": f"token {pat_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    # Make a GET request to the GitHub API
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json().get("value")
+    else:
+        return None
+
+def store_secret(secret):
+    # Store the secret for later use in the code
+    # You can implement the storage mechanism based on your requirements
+    # For simplicity, let's just print the secret
+    print("GitHub Secret (bot_token):", secret)
+
+def retrieved_token():
+    # Get the personal access token from Firebase
+    token = get_pat_token()
+    if token:
+        # Get the repository secret from GitHub using the personal access token
+        secret = get_pat(token)
+        if secret:
+            # Store the secret for later use
+            store_secret(secret)
+        else:
+            print("Failed to retrieve GitHub secret.")
+    else:
+        print("Failed to retrieve Firebase personal access token.")
+
+if __name__ == "retrieved_token":
+    retrieved_token()
 
 async def get_setting(setting_name):
     setting_ref = db.collection("command_configuration").document(setting_name)
@@ -91,15 +148,6 @@ async def commandpermissions(ctx):
     await ctx.send("You do not have permission to use this command.")
     return False
 
-# Function to get the bot token from Firestore
-async def get_bot_token():
-    bot_token_ref = db.collection("secrets").document("bot_token")
-    snapshot = await bot_token_ref.get()  # Await the asynchronous operation
-    if snapshot.exists:
-        return snapshot.to_dict().get("value")
-    else:
-        raise ValueError("Bot token not found in Firestore.")
-
 # Function to retrieve command configuration from Firestore
 async def get_command_config():
     settings_ref = db.collection("command_configuration").document("command_config")
@@ -127,7 +175,7 @@ async def get_warn_count(member_id):
 async def get_server_invite(ctx):
     """Get the server invite link from Firestore."""
     try:
-        invite_ref = db.collection("secrets").document("server-invite")
+        invite_ref = db.collection("secrets").document("server_invite")
         snapshot = invite_ref.get()
         if snapshot.exists:
             return snapshot.to_dict().get("pawers-smp")
@@ -140,7 +188,7 @@ async def get_server_invite(ctx):
 async def set_server_invite(invite_data):
     """Set the server invite link in Firestore."""
     try:
-        invite_ref = db.collection("secrets").document("server-invite")
+        invite_ref = db.collection("secrets").document("server_invite")
         invite_ref.set({"pawers-smp": invite_data})
     except Exception as e:
         print(f"Error setting server invite: {e}")
@@ -151,12 +199,30 @@ async def log_events(ctx, message):
     if log_channel_id:
         log_channel = bot.get_channel(int(log_channel_id))
         if log_channel:
-            log_message = f'<@{ctx.user.id}> {message}'  # Include user's display name, action, and channel name
+            log_message = f'Executed: <@{ctx.user.id}> | {message}'  # Include user's display name, action, and channel name
             await log_channel.send(log_message)
         else:
             print("Error: Log channel not found")
     else:
         print("Error: Logging channel ID not set")
+
+def get_bot_token():
+    # Assuming the personal access token is stored in a document named 'bot_token'
+    token_ref = db.collection("secrets").document("bot_token")
+    token_doc = token_ref.get()
+    if token_doc.exists:
+        return token_doc.to_dict().get("token")
+    else:
+        return None
+
+def run_bot():
+    # Get the personal access token from Firestore
+    token = get_bot_token()
+    if token:
+        # Initialize the bot with the token
+        bot.run(token)
+    else:
+        print("Failed to retrieve Firebase personal access token.")
 
 class ApplicationCommandOptionType(Enum):
     STRING = 3
@@ -357,13 +423,18 @@ async def logging(ctx, channel: nextcord.TextChannel = None, toggle: bool = None
 
 # Command: Make an announcement.
 @bot.slash_command(description="Make an announcement.")
-async def announce(ctx, message: str):
+async def announce(ctx, message: str, ping_everyone: bool = False):
     """Make an announcement."""
     if await commandpermissions(ctx):
-        announcement_channel_id = await get_setting("announcement_channel_id")
+        announcement_channel_id = await get_channel_id("setannouncementchannel", "announcements")
         if announcement_channel_id:
             announcement_channel = bot.get_channel(int(announcement_channel_id))
-            await announcement_channel.send(message)
+            if ping_everyone:
+                await announcement_channel.send("@everyone " + message)
+                await ctx.send("Announcement made successfully")
+            else:
+                await announcement_channel.send(message)
+                await ctx.send("Announcement made successfully")
         else:
             await ctx.send("Announcement channel is not set. Use /setannouncementchannel command to set it.")
 
@@ -372,7 +443,7 @@ async def announce(ctx, message: str):
 async def setannouncementchannel(ctx, channel: nextcord.TextChannel):
     """Set the announcement channel."""
     if await commandpermissions(ctx):
-        await set_channel_id("announcement_channel", channel.name, channel.id)
+        await set_channel_id("setannouncementchannel", channel.name, channel.id)
         await ctx.send(f"Announcement channel set to {channel.mention}.")
 
 # Command: Get server invite link
@@ -398,29 +469,38 @@ async def setinvite(ctx, invite: str):
 async def help(ctx):
     """Show help information."""
     await ctx.send(
-"""**Available Commands**
+"""**Moderation Commands:**
+- `ban` | Ban a member from the server.
+- `unban` | Unban a member from the server.
+- `kick` | Kick a member from the server.
+- `warn` | Warn a member.
+- `serverwarns` | View all warnings for the server.
+- `warns` | View warns for a member.
+- `clearwarnings` | Clear warns for a member.
+- `mute` | Mute a member to prevent them from sending messages.
+- `unmute` | Unmute a member to allow them to send messages again.
+- `lock` | Lock a channel to prevent members from sending messages.
+- `unlock` | Unlock a previously locked channel.
+- `announce` | Make an announcement.
 
-**/ban** - Ban a member from the server.
-**/unban** - Unban a member from the server.
-**/kick** - Kick a member from the server.
-**/warn** - Warn a member.
-**/serverwarns** - View all warnings for the server.
-**/warns** - View warns for a member.
-**/clearwarnings** - Clear warns for a member.
-**/setwarnthreshold** - Set the warn threshold.
-**/setwarnpunishment** - Set the punishment for crossing/meeting the warn threshold.
-**/mute** - Mute a member to prevent them from sending messages.
-**/unmute** - Unmute a member to allow them to send messages again.
-**/lock** - Lock a channel to prevent members from sending messages.
-**/unlock** - Unlock a previously locked channel.
-**/purge** - Purge messages from a channel.
-**/addrole** - Add a role to a member.
-**/removerole** - Remove a role from a member.
-**/logging** - Set or toggle the logging channel.
-**/announce** - Make an announcement.
-**/setannouncementchannel** - Set the announcement channel.
-**/invite** - Get server invite link.
-**/setinvite** - Set the server invite link.""")
-    
-# Start the bot
-bot.run("OTk3MjA2MTE2ODYzODUyNzA2.GSiZpf.mGbHqB7OKgdn3qyNJWj09umv8lDwamKqIgxG7c")
+**Settings and Configuration Commands**
+- `setwarnthreshold` | Set the warn threshold.
+- `setwarnpunishment` | Set the punishment for crossing/meeting the warn threshold.
+- `logging` | Set or toggle the logging channel.
+- `setannouncementchannel` | Set the announcement channel.
+- `setinvite` | Set the server invite link.
+
+**Role Management Commands:**
+- `addrole` | Add a role to a member.
+- `removerole` | Remove a role from a member.
+
+**Utility Commands:**
+- `purge` | Purge messages from a channel.
+- `invite` | Get server invite link.
+
+**General Commands:**
+- `help` | Show help information.""")
+
+# Call the run_bot function to start the bot
+if __name__ == "__main__":
+    run_bot()
