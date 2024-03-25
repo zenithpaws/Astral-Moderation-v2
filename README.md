@@ -22,7 +22,7 @@ This is a Discord moderation bot built using [nextcord](https://nextcord.dev/) (
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/zenithpaws/Ryzen-Moderation-v2
+   git clone https://github.com/zenithpaws/Astral-Moderation-v2
    ```
 
 # Discord Bot and Firebase Setup Guide
