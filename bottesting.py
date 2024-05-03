@@ -157,111 +157,6 @@ async def set_server_invite(invite_data):
     except Exception as e:
         print(f"Error setting server invite: {e}")
 
-# Function to get join message channel from Firestore
-async def get_join_message_channel():
-    """Get the join message channel from Firestore."""
-    try:
-        join_channel_ref = db.collection("command_configuration").document("join_channel")
-        snapshot = join_channel_ref.get()
-        if snapshot.exists:
-            return snapshot.to_dict().get("channel_id")
-    except Exception as e:
-        print(f"Error getting join message channel: {e}")
-    return None
-
-# Function to set join message channel in Firestore
-async def set_join_message_channel(channel_id):
-    """Set the join message channel in Firestore."""
-    try:
-        join_channel_ref = db.collection("command_configuration").document("join_channel")
-        join_channel_ref.set({"channel_id": channel_id})
-    except Exception as e:
-        print(f"Error setting join message channel: {e}")
-
-# Function to get leave message channel from Firestore
-async def get_leave_message_channel():
-    """Get the leave message channel from Firestore."""
-    try:
-        leave_channel_ref = db.collection("command_configuration").document("leave_channel")
-        snapshot = leave_channel_ref.get()
-        if snapshot.exists:
-            return snapshot.to_dict().get("channel_id")
-    except Exception as e:
-        print(f"Error getting leave message channel: {e}")
-    return None
-
-# Function to set leave message channel in Firestore
-async def set_leave_message_channel(channel_id):
-    """Set the leave message channel in Firestore."""
-    try:
-        leave_channel_ref = db.collection("command_configuration").document("leave_channel")
-        leave_channel_ref.set({"channel_id": channel_id})
-    except Exception as e:
-        print(f"Error setting leave message channel: {e}")
-
-# Function to get welcome message from Firestore
-async def get_join_message():
-    """Get the welcome message from Firestore."""
-    try:
-        welcome_ref = db.collection("command_configuration").document("join_message")
-        snapshot = welcome_ref.get()
-        if snapshot.exists:
-            return snapshot.to_dict().get("message")
-    except Exception as e:
-        print(f"Error getting welcome message: {e}")
-    return None
-
-# Function to set welcome message in Firestore
-async def set_join_message(message):
-    """Set the welcome message in Firestore."""
-    try:
-        welcome_ref = db.collection("command_configuration").document("join_message")
-        welcome_ref.set({"message": message})
-    except Exception as e:
-        print(f"Error setting welcome message: {e}")
-
-# Function to get leave message from Firestore
-async def get_leave_message():
-    """Get the leave message from Firestore."""
-    try:
-        leave_ref = db.collection("command_configuration").document("leave_message")
-        snapshot = leave_ref.get()
-        if snapshot.exists:
-            return snapshot.to_dict().get("message")
-    except Exception as e:
-        print(f"Error getting leave message: {e}")
-    return None
-
-# Function to set leave message in Firestore
-async def set_leave_message(message):
-    """Set the leave message in Firestore."""
-    try:
-        leave_ref = db.collection("command_configuration").document("leave_message")
-        leave_ref.set({"message": message})
-    except Exception as e:
-        print(f"Error setting leave message: {e}")
-
-# Event listener: Send join and leave messages
-@bot.event
-async def on_member_join(member: nextcord.Member):
-    join_message_channel_id = await get_join_message_channel()
-    if join_message_channel_id:
-        join_message_channel = bot.get_channel(join_message_channel_id)
-        if join_message_channel:
-            join_message = await get_join_message()
-            if join_message:
-                await join_message_channel.send(f"{member.mention} {join_message}")
-
-@bot.event
-async def on_member_remove(member: nextcord.Member):
-    leave_message_channel_id = await get_leave_message_channel()
-    if leave_message_channel_id:
-        leave_message_channel = bot.get_channel(leave_message_channel_id)
-        if leave_message_channel:
-            leave_message = await get_leave_message()
-            if leave_message:
-                await leave_message_channel.send(f"{member.mention} {leave_message}")
-
 # Function to log ran commands
 async def log_events(ctx, message):
     log_channel_id = await get_channel_id(command_name='logging', channel_name='modlogs')
@@ -288,6 +183,9 @@ async def on_ready():
 async def ban(ctx, member: nextcord.Member, *, reason=None):
     """Ban a member from the server."""
     if await permission_check(ctx):
+        # Print out the value of the member parameter for debugging
+        print(f"Member parameter: {member}")
+
         if ctx.guild.get_member(member.id):  # Check if the user is still a member of the server
             if ctx.guild.me.guild_permissions.ban_members:  # Check if the bot has permission to ban members
                 try:
@@ -569,38 +467,6 @@ async def setinvite(ctx, invite: str):
             await ctx.send("Server invite link has been set")
         except Exception as e:
             await ctx.send(f"Error setting server invite link: {str(e)}")
-
-# Command: Set welcome message
-@bot.slash_command(description="Set the welcome message.")
-async def setjoinmessage(ctx, message: str):
-    """Set the welcome message."""
-    if await permission_check(ctx):
-        await set_join_message(message)
-        await ctx.send("Welcome message set successfully.")
-
-# Command: Set leave message
-@bot.slash_command(description="Set the leave message.")
-async def setleavemessage(ctx, message: str):
-    """Set the leave message."""
-    if await permission_check(ctx):
-        await set_leave_message(message)
-        await ctx.send("Leave message set successfully.")
-
-# Command: Set join message channel
-@bot.slash_command(description="Set the channel for sending join messages.")
-async def setjoinmessagechannel(ctx, channel: nextcord.TextChannel):
-    """Set the channel for sending join messages."""
-    if await permission_check(ctx):
-        await set_join_message_channel(channel.id)
-        await ctx.send(f"Join message channel set to {channel.mention}.")
-
-# Command: Set leave message channel
-@bot.slash_command(description="Set the channel for sending leave messages.")
-async def setleavemeesagechannel(ctx, channel: nextcord.TextChannel):
-    """Set the channel for sending leave messages."""
-    if await permission_check(ctx):
-        await set_leave_message_channel(channel.id)
-        await ctx.send(f"Leave message channel set to {channel.mention}.")
 
 # Command: Show help information.
 @bot.slash_command(description="Show help information.")
