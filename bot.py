@@ -608,36 +608,40 @@ async def help(ctx):
     """Show help information."""
     await ctx.send(
 """**Moderation Commands:**
-- `ban` | Ban a member from the server.
-- `unban` | Unban a member from the server.
-- `kick` | Kick a member from the server.
-- `warn` | Warn a member.
-- `serverwarns` | View all warnings for the server.
-- `warns` | View warns for a member.
-- `clearwarnings` | Clear warns for a member.
-- `mute` | Mute a member to prevent them from sending messages.
-- `unmute` | Unmute a member to allow them to send messages again.
-- `lock` | Lock a channel to prevent members from sending messages.
-- `unlock` | Unlock a previously locked channel.
-- `announce` | Make an announcement.
+- `/ban` | Ban a member from the server.
+- `/unban` | Unban a member from the server.
+- `/kick` | Kick a member from the server.
+- `/warn` | Warn a member.
+- `/serverwarns` | View all warnings for the server.
+- `/warns` | View warns for a member.
+- `/clearwarnings` | Clear warns for a member.
+- `/mute` | Mute a member to prevent them from sending messages.
+- `/unmute` | Unmute a member to allow them to send messages again.
+- `/lock` | Lock a channel to prevent members from sending messages.
+- `/unlock` | Unlock a previously locked channel.
+- `/announce` | Make an announcement.
 
 **Settings and Configuration Commands**
-- `setwarnthreshold` | Set the warn threshold.
-- `setwarnpunishment` | Set the punishment for crossing/meeting the warn threshold.
-- `logging` | Set or toggle the logging channel.
-- `setannouncementchannel` | Set the announcement channel.
-- `setinvite` | Set the server invite link.
+- `/setwarnthreshold` | Set the warn threshold.
+- `/setwarnpunishment` | Set the punishment for crossing/meeting the warn threshold.
+- `/logging` | Set or toggle the logging channel.
+- `/setannouncementchannel` | Set the announcement channel.
+- `/setinvite` | Set the server invite link.
+- `/setjoinmessage` | Set the welcome message.
+- `/setleavemessage` | Set the leave message.
+- `/setjoinmessagechannel` | Set the channel for sending join messages.
+- `/setleavemeesagechannel` | Set the channel for sending leave messages.
 
 **Role Management Commands:**
-- `addrole` | Add a role to a member.
-- `removerole` | Remove a role from a member.
+- `/addrole` | Add a role to a member.
+- `/removerole` | Remove a role from a member.
 
 **Utility Commands:**
-- `purge` | Purge messages from a channel.
-- `invite` | Get server invite link.
+- `/purge` | Purge messages from a channel.
+- `/invite` | Get server invite link.
 
 **General Commands:**
-- `help` | Show help information.""")
+- `/help` | Show help information.""")
 
 # Call the run_bot function to start the bot
 if __name__ == "__main__":
