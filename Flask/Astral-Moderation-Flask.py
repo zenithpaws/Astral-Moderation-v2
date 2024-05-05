@@ -15,7 +15,7 @@ def index():
 
 @app.route('/start')
 def start():
-    execute_command(['/home/ryzenfox/Astral-Moderation-v2/pythonvenv/python3.11.2-astral/bin/python', '/home/ryzenfox/Astral-Moderation-v2/bot.py'])
+    execute_command(['/usr/share/pythonvenv/python3.11.2-astral/bin/python', '/home/ryzenfox/Astral-Moderation-v2/bot.py'])
     return 'Bot started successfully'
 
 @app.route('/stop')
@@ -27,7 +27,7 @@ def stop():
 def restart():
     execute_command(['pkill', '-f', 'bot.py'])
     time.sleep(5)
-    execute_command(['/home/ryzenfox/Astral-Moderation-v2/pythonvenv/python3.11.2-astral/bin/python', '/home/ryzenfox/Astral-Moderation-v2/bot.py'])
+    execute_command(['/usr/share/pythonvenv/python3.11.2-astral/bin/python', '/home/ryzenfox/Astral-Moderation-v2/bot.py'])
     return 'Bot restarted successfully'
 
 @app.route('/gitpull')
@@ -36,7 +36,7 @@ def gitpull():
     time.sleep(2)
     execute_command(['git', '-C', '/home/ryzenfox/Astral-Moderation-v2', 'pull'])
     time.sleep(5)
-    execute_command(['/home/ryzenfox/Astral-Moderation-v2/pythonvenv/python3.11.2-astral/bin/python', '/home/ryzenfox/Astral-Moderation-v2/bot.py'])
+    execute_command(['/usr/share/pythonvenv/python3.11.2-astral/bin/python', '/home/ryzenfox/Astral-Moderation-v2/bot.py'])
     return 'Main branch sync and bot restart completed successfully'
 
 @app.route('/systemrestart')
