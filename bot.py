@@ -1,8 +1,15 @@
+import os
 import nextcord
 import firebase_admin
 from nextcord.ext import commands
 from firebase_admin import credentials, firestore
 from enum import Enum
+
+pid = os.getpid()
+
+with open('Flask/pid.txt', 'w') as file:
+    file.write(str(pid))
+print(f"PID ({pid}) stored in Flask/pid.txt")
 
 # Set your bot's prefix
 prefix = "/"
