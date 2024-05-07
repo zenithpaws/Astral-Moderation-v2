@@ -33,10 +33,10 @@ def restart():
     print("Bot restarted successfully")
     return 'Bot restarted successfully'
 
-@app.route('/gitpull')
-def gitpull():
+@app.route('/gitfetch')
+def gitfetch():
     stop()
-    os.system('git -C C:/Users/furio/OneDrive/Documents/GitHub/Astral-Moderation-v2/ pull')
+    os.system('git -C C:/Users/furio/OneDrive/Documents/GitHub/Astral-Moderation-v2/ fetch')
     start()
     print("Main branch sync and bot restart completed successfully; Flask changes won't take effect until a script restart")
     return "Main branch sync and bot restart completed successfully; Flask changes won't take effect until a script restart"
