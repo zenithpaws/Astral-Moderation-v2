@@ -421,7 +421,7 @@ async def warns(ctx, member: nextcord.Member):
 
 # Command: Clear warns for a member
 @bot.slash_command(description="Clear warns for a member.")
-async def clearwarnings(ctx, member: nextcord.Member):
+async def clearwarns(ctx, member: nextcord.Member):
     """Clear warns for a member."""
     if await permission_check(ctx):
         await clear_member_warns(member)  # noqa: F821
@@ -621,7 +621,7 @@ async def help(ctx):
 - `/warn` | Warn a member.
 - `/serverwarns` | View all warnings for the server.
 - `/warns` | View warns for a member.
-- `/clearwarnings` | Clear warns for a member.
+- `/clearwarns` | Clear warns for a member.
 - `/mute` | Mute a member to prevent them from sending messages.
 - `/unmute` | Unmute a member to allow them to send messages again.
 - `/lock` | Lock a channel to prevent members from sending messages.
