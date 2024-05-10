@@ -1,0 +1,16 @@
+[console_scripts]
+mudump = modelutils.commands.dump:main
+mugetdata = modelutils.commands.get_data:main
+muload = modelutils.commands.load:main
+murun = modelutils.commands.run:main
+musetdata = modelutils.commands.set_data:main
+musummarize = modelutils.commands.summarize:main
+npdiff = modelutils.commands.diff:main
+npget = modelutils.commands.get:main
+npimage = modelutils.commands.image:main
+npjson = modelutils.commands.json:main
+npmax = modelutils.commands.max:main
+npprint = modelutils.commands.print:main
+nptranspose = modelutils.commands.transpose:main
+npzeros = modelutils.commands.zeros:main
+

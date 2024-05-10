@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: chatbots
+Version: 0.1.0
+Summary: Various chatbots with natural language processing.
+Home-page: https://github.com/samsonq/chatbots
+Author: Samson Qian
+Author-email: samsonqian@gmail.com
+License: MIT
+Keywords: chatbot nlp
+Platform: UNKNOWN
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# chatbots
+

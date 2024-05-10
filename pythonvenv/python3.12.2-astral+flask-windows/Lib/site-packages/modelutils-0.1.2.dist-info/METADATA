@@ -1,0 +1,18 @@
+Metadata-Version: 2.1
+Name: modelutils
+Version: 0.1.2
+Summary: Utility scripts for various deep learning models
+Home-page: https://github.com/shonohs/modelutils
+License: MIT
+Platform: UNKNOWN
+Requires-Dist: numpy
+Requires-Dist: Pillow
+Provides-Extra: all
+Requires-Dist: coremltools ; extra == 'all'
+Requires-Dist: onnx ; extra == 'all'
+Requires-Dist: onnxruntime ; extra == 'all'
+Requires-Dist: tensorflow-cpu ; extra == 'all'
+
+UNKNOWN
+
+

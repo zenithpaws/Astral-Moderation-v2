@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: gpt4
+Version: 0.0.1
+Summary: A CLI for chatting with OpenAI's API.
+Author-email: Ryan Young <dev@ryayoung.com>
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Software Development :: Libraries
+Requires-Dist: openai
+Requires-Dist: requests
