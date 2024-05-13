@@ -3,8 +3,10 @@
 firebase.json
 .DS_Store
 pid.txt
-kiro.py
 bot-dev.py
 bot-dev-pycai2.py
 bot-dev-gpt-3.5-turbo-semi-working.py
+bot-dev-gpt-local.py
+kiro.py
+fem.py
 rolenameandid.txt
