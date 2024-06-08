@@ -332,7 +332,7 @@ async def unban(ctx, *, member):
     if await permission_check(ctx):
         try:
             bans_ref = db.collection("data").document("bans")
-            bans_data = bans_ref.get().to_dict()
+            bans_data = bans_ref.get().to_dict()    
             if bans_data:
                 # Check if the member parameter contains a discriminator
                 if "#" in member:
