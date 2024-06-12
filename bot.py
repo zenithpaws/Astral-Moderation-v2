@@ -344,7 +344,7 @@ async def unban(ctx, *, member):
     if await permission_check(ctx):
         try:
             bans_ref = db.collection("data").document("bans")
-            bans_data = bans_ref.get().to_dict()
+            bans_data = bans_ref.get().to_dict()    
             if bans_data:
                 # Check if the member parameter contains a discriminator
                 if "#" in member:
@@ -461,7 +461,7 @@ async def setwarnpunishment(ctx, action: str):
 async def mute(ctx, member: nextcord.Member):
     """Mute a member to prevent them from sending messages."""
     if await permission_check(ctx):
-        await member.add_roles(ctx.guild.get_role(get_muted_role_id()))  # noqa: F821
+        await member.add_roles(ctx.guild.get_role(await get_muted_role_id()))
         await ctx.send(f'{member.mention} has been muted.')
         await log_events(ctx, f'{member.mention} has been muted.')
 
