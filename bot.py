@@ -69,7 +69,7 @@ async def get_allowed_roles():
     allowed_roles = {}
 
     try:
-        doc_ref = db.collection('role_names').document('allowed_commands')
+        doc_ref = db.collection('roles').document('allowed_commands')
         doc = doc_ref.get()  # Remove 'await' from here
         if doc.exists:
             data = doc.to_dict()
@@ -85,10 +85,10 @@ async def permission_check(ctx):
     allowed_roles = await get_allowed_roles()  # Await the asynchronous operation
 
     # Get the names of the roles the user has
-    user_role_names = [role.name for role in ctx.user.roles]
+    user_roles = [role.name for role in ctx.user.roles]
 
     # Check if any of the user's roles are allowed
-    for role_name in user_role_names:
+    for role_name in user_roles:
         if role_name in allowed_roles and allowed_roles[role_name]:
             return True
 
@@ -148,7 +148,7 @@ async def get_server_invite(ctx):
         invite_ref = db.collection("secrets").document("server_invite")
         snapshot = invite_ref.get()
         if snapshot.exists:
-            return snapshot.to_dict().get("pawers-smp")
+            return snapshot.to_dict().get("link")
         else:
             return None
     except Exception as e:
@@ -160,7 +160,7 @@ async def set_server_invite(invite_data):
     """Set the server invite link in Firestore."""
     try:
         invite_ref = db.collection("secrets").document("server_invite")
-        invite_ref.set({"pawers-smp": invite_data})
+        invite_ref.set({"link": invite_data})
     except Exception as e:
         print(f"Error setting server invite: {e}")
 
@@ -247,6 +247,18 @@ async def set_leave_message(message):
         leave_ref.set({"message": message})
     except Exception as e:
         print(f"Error setting leave message: {e}")
+
+# Function to get the muted role id from Firestore
+async def get_muted_role_id():
+    """Get the join message channel from Firestore."""
+    try:
+        join_channel_ref = db.collection("command_configuration").document("muted_role")
+        snapshot = join_channel_ref.get()
+        if snapshot.exists:
+            return snapshot.to_dict().get("id")
+    except Exception as e:
+        print(f"Error getting join message channel: {e}")
+    return None
 
 # Event listener: Send join and leave messages
 @bot.event
