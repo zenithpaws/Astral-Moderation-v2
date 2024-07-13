@@ -42,26 +42,46 @@ async def set_setting(setting_name, setting_value):
     else:
         setting_ref.set({"value": setting_value})
 
-async def get_channel_id(command_name, channel_name):
+async def get_channel_id(str):
     """Get the channel ID from Firestore."""
-    channel_ref = db.collection("channel_ids").document(command_name)
+    channel_ref = db.collection("channel_ids").document(str)
     try:
         snapshot = channel_ref.get()
         if snapshot.exists:
-            return snapshot.to_dict().get(channel_name)
+            return snapshot.to_dict().get("id")
         else:
             return None
     except Exception as e:
         print(f"Error getting channel ID: {e}")
         return None
 
-async def set_channel_id(command_name, channel_name, channel_id):
+async def set_channel_id(str, channel_name, channel_id):
     """Set the channel ID in Firestore."""
-    channel_ref = db.collection("channel_ids").document(command_name)
+    channel_ref = db.collection("channel_ids").document(str)
     try:
-        channel_ref.set({channel_name: channel_id})
+        channel_ref.set({"id": channel_id})
     except Exception as e:
         print(f"Error setting channel ID: {e}")
+
+async def set_role_id(str, role_name, role_id):
+    """Set the role ID in Firestore."""
+    channel_ref = db.collection("roles").document(str)
+    try:
+        channel_ref.set({"id": role_id})
+    except Exception as e:
+        print(f"Error setting role ID: {e}")
+
+# Function to get the role id from Firestore
+async def get_role_id(str):
+    """Get the role id from Firestore."""
+    try:
+        channel_ref = db.collection("roles").document(str)
+        snapshot = channel_ref.get()
+        if snapshot.exists:
+            return snapshot.to_dict().get("id")
+    except Exception as e:
+        print(f"Error getting role id: {e}")
+    return None
 
 # Function to check what roles are allowed to run commands
 async def get_allowed_roles():
@@ -116,20 +136,6 @@ def run_bot():
     else:
         print("Failed to retrieve Firebase personal access token.")
 
-# Function to retrieve command configuration from Firestore
-async def get_command_config():
-    settings_ref = db.collection("command_configuration").document("command_config")
-    snapshot = settings_ref.get()
-    if snapshot.exists:
-        return snapshot.to_dict() or {}
-    else:
-        return {}
-
-# Function to set command configuration in Firestore
-async def set_command_config(config):
-    settings_ref = db.collection("command_configuration").document("command_config")
-    settings_ref.set(config)  # No need to use await here
-
 # Function to get the warn count of a member
 async def get_warn_count(member_id):
     """Get the warn count for a member."""
@@ -163,48 +169,6 @@ async def set_server_invite(invite_data):
         invite_ref.set({"link": invite_data})
     except Exception as e:
         print(f"Error setting server invite: {e}")
-
-# Function to get join message channel from Firestore
-async def get_join_message_channel():
-    """Get the join message channel from Firestore."""
-    try:
-        join_channel_ref = db.collection("command_configuration").document("join_channel")
-        snapshot = join_channel_ref.get()
-        if snapshot.exists:
-            return snapshot.to_dict().get("channel_id")
-    except Exception as e:
-        print(f"Error getting join message channel: {e}")
-    return None
-
-# Function to set join message channel in Firestore
-async def set_join_message_channel(channel_id):
-    """Set the join message channel in Firestore."""
-    try:
-        join_channel_ref = db.collection("command_configuration").document("join_channel")
-        join_channel_ref.set({"channel_id": channel_id})
-    except Exception as e:
-        print(f"Error setting join message channel: {e}")
-
-# Function to get leave message channel from Firestore
-async def get_leave_message_channel():
-    """Get the leave message channel from Firestore."""
-    try:
-        leave_channel_ref = db.collection("command_configuration").document("leave_channel")
-        snapshot = leave_channel_ref.get()
-        if snapshot.exists:
-            return snapshot.to_dict().get("channel_id")
-    except Exception as e:
-        print(f"Error getting leave message channel: {e}")
-    return None
-
-# Function to set leave message channel in Firestore
-async def set_leave_message_channel(channel_id):
-    """Set the leave message channel in Firestore."""
-    try:
-        leave_channel_ref = db.collection("command_configuration").document("leave_channel")
-        leave_channel_ref.set({"channel_id": channel_id})
-    except Exception as e:
-        print(f"Error setting leave message channel: {e}")
 
 # Function to get welcome message from Firestore
 async def get_join_message():
@@ -248,51 +212,38 @@ async def set_leave_message(message):
     except Exception as e:
         print(f"Error setting leave message: {e}")
 
-# Function to get the muted role id from Firestore
-async def get_muted_role_id():
-    """Get the join message channel from Firestore."""
-    try:
-        join_channel_ref = db.collection("command_configuration").document("muted_role")
-        snapshot = join_channel_ref.get()
-        if snapshot.exists:
-            return snapshot.to_dict().get("id")
-    except Exception as e:
-        print(f"Error getting join message channel: {e}")
-    return None
-
 # Event listener: Send join and leave messages
 @bot.event
 async def on_member_join(member: nextcord.Member):
-    join_message_channel_id = await get_join_message_channel()
-    if join_message_channel_id:
-        join_message_channel = bot.get_channel(join_message_channel_id)
-        if join_message_channel:
+    join_channel_id = await get_channel_id("join_channel")
+    if join_channel_id:
+        join_channel = bot.get_channel(join_channel_id)
+        if join_channel:
             join_message = await get_join_message()
             if join_message:
-                await join_message_channel.send(f"{member.mention} {join_message}")
+                await join_channel.send(f"{member.mention} {join_message}")
 
 @bot.event
 async def on_member_remove(member: nextcord.Member):
-    leave_message_channel_id = await get_leave_message_channel()
-    if leave_message_channel_id:
-        leave_message_channel = bot.get_channel(leave_message_channel_id)
-        if leave_message_channel:
+    leave_channel_id = await get_channel_id("leave_channel")
+    if leave_channel_id:
+        leave_channel = bot.get_channel("leave_channel")
+        if leave_channel:
             leave_message = await get_leave_message()
             if leave_message:
-                await leave_message_channel.send(f"{member.mention} {leave_message}")
+                await leave_channel.send(f"{member.mention} {leave_message}")
 
 # Function to log ran commands
 async def log_events(ctx, message):
-    log_channel_id = await get_channel_id(command_name='logging', channel_name='modlogs')
-    if log_channel_id:
-        log_channel = bot.get_channel(int(log_channel_id))
-        if log_channel:
-            log_message = f'Executed: <@{ctx.user.id}> | {message}'  # Include user's display name, action, and channel name
-            await log_channel.send(log_message)
+    if await get_setting("logging") == True:
+        log_channel_id = await get_channel_id("logging_channel")
+        if log_channel_id:
+            log_channel = bot.get_channel(int(log_channel_id))
+            if log_channel:
+                log_message = f'Executed: <@{ctx.user.id}> | {message}'  # Include user's display name, action, and channel name
+                await log_channel.send(log_message)
         else:
-            print("Error: Log channel not found")
-    else:
-        print("Error: Logging channel ID not set")
+                print("Error: Logging channel not found")
 class ApplicationCommandOptionType(Enum):
     STRING = 3
 
@@ -420,7 +371,7 @@ async def warn(ctx, member: nextcord.Member, reason: str):
 async def serverwarns(ctx):
     """View all warnings for the server."""
     if await permission_check(ctx, "serverwarns"):
-        server_warns = await get_server_warns(ctx.guild)  # noqa: F821
+        server_warns = await get_server_warns(ctx.guild)
         await ctx.send(server_warns)
 
 # Command: View warns for a member
@@ -428,7 +379,7 @@ async def serverwarns(ctx):
 async def warns(ctx, member: nextcord.Member):
     """View warns for a member."""
     if await permission_check(ctx):
-        member_warns = await get_member_warns(member)  # noqa: F821
+        member_warns = await get_member_warns(member)
         await ctx.send(member_warns)
 
 # Command: Clear warns for a member
@@ -436,7 +387,7 @@ async def warns(ctx, member: nextcord.Member):
 async def clearwarns(ctx, member: nextcord.Member):
     """Clear warns for a member."""
     if await permission_check(ctx):
-        await clear_member_warns(member)  # noqa: F821
+        await clear_member_warns(member)
         await ctx.send(f'Warns cleared for {member.mention}.')
         await log_events(ctx, f'Warns cleared for {member.mention}.')
 
@@ -461,7 +412,7 @@ async def setwarnpunishment(ctx, action: str):
 async def mute(ctx, member: nextcord.Member):
     """Mute a member to prevent them from sending messages."""
     if await permission_check(ctx):
-        await member.add_roles(ctx.guild.get_role(await get_muted_role_id()))
+        await member.add_roles(ctx.guild.get_role(await get_role_id("mute_role")))
         await ctx.send(f'{member.mention} has been muted.')
         await log_events(ctx, f'{member.mention} has been muted.')
 
@@ -470,9 +421,17 @@ async def mute(ctx, member: nextcord.Member):
 async def unmute(ctx, member: nextcord.Member):
     """Unmute a member to allow them to send messages again."""
     if await permission_check(ctx):
-        await member.remove_roles(ctx.guild.get_role(get_muted_role_id()))  # noqa: F821
+        await member.remove_roles(ctx.guild.get_role(await get_role_id("mute_role")))
         await ctx.send(f'{member.mention} has been unmuted.')
         await log_events(ctx, f'{member.mention} has been unmuted.')
+
+# Command: Set the announcement channel.
+@bot.slash_command(description="Set the minor announcement role.")
+async def setmuterole(ctx, role: nextcord.Role):
+    """Set the minor announcement channel."""
+    if await permission_check(ctx):
+        await set_role_id("mute_role", role.name, role.id)
+        await ctx.send(f"Mute role set to {role.mention}.")
 
 # Command: Lock a channel
 @bot.slash_command(description="Lock a channel to prevent members from sending messages.")
@@ -537,10 +496,10 @@ async def logging(ctx, channel: nextcord.TextChannel = None, toggle: bool = None
     """Set or toggle the logging channel."""
     if await permission_check(ctx):
         if channel:
-            await set_channel_id("logging", channel.name, channel.id)
+            await set_channel_id("logging_channel", channel.name, channel.id)
             await ctx.send(f"Logging channel set to {channel.mention}.")
         elif toggle is not None:
-            await set_setting("logging_toggle", toggle)
+            await set_setting("logging", toggle)
             status = "enabled" if toggle else "disabled"
             await ctx.send(f"Logging is now {status}.")
         else:
@@ -548,14 +507,18 @@ async def logging(ctx, channel: nextcord.TextChannel = None, toggle: bool = None
 
 # Command: Make an announcement.
 @bot.slash_command(description="Make an announcement.")
-async def announce(ctx, message: str, ping_everyone: bool = False):
+async def announce(ctx, message: str, ping_everyone: bool = False, minor_announcement: bool = False):
     """Make an announcement."""
     if await permission_check(ctx):
-        announcement_channel_id = await get_channel_id("setannouncementchannel", "announcements")
-        if announcement_channel_id:
-            announcement_channel = bot.get_channel(int(announcement_channel_id))
+        announcement_channel = await get_channel_id("announcement_channel")
+        if announcement_channel:
+            announcement_channel = bot.get_channel(int(announcement_channel))
             if ping_everyone:
                 await announcement_channel.send("@everyone " + message)
+                await ctx.send("Announcement made successfully")
+            if minor_announcement:
+                minorannouncementrole = await get_role_id("minorannouncementrole")
+                await announcement_channel.send(f"<@&{minorannouncementrole}> " + message)
                 await ctx.send("Announcement made successfully")
             else:
                 await announcement_channel.send(message)
@@ -568,8 +531,16 @@ async def announce(ctx, message: str, ping_everyone: bool = False):
 async def setannouncementchannel(ctx, channel: nextcord.TextChannel):
     """Set the announcement channel."""
     if await permission_check(ctx):
-        await set_channel_id("setannouncementchannel", channel.name, channel.id)
+        await set_channel_id("announcement_channel", channel.name, channel.id)
         await ctx.send(f"Announcement channel set to {channel.mention}.")
+
+# Command: Set the announcement channel.
+@bot.slash_command(description="Set the minor announcement role.")
+async def setminorannouncementrole(ctx, role: nextcord.Role):
+    """Set the minor announcement channel."""
+    if await permission_check(ctx):
+        await set_role_id("minorannouncementrole", role.name, role.id)
+        await ctx.send(f"Minor announcement role set to {role.mention}.")
 
 # Command: Get server invite link
 @bot.slash_command(description="Get server invite link")
@@ -607,18 +578,18 @@ async def setleavemessage(ctx, message: str):
 
 # Command: Set join message channel
 @bot.slash_command(description="Set the channel for sending join messages.")
-async def setjoinmessagechannel(ctx, channel: nextcord.TextChannel):
+async def setjoinchannel(ctx, channel: nextcord.TextChannel):
     """Set the channel for sending join messages."""
     if await permission_check(ctx):
-        await set_join_message_channel(channel.id)
+        await set_channel_id("join_channel", channel.name, channel.id)
         await ctx.send(f"Join message channel set to {channel.mention}.")
 
 # Command: Set leave message channel
 @bot.slash_command(description="Set the channel for sending leave messages.")
-async def setleavemeesagechannel(ctx, channel: nextcord.TextChannel):
+async def setleavechannel(ctx, channel: nextcord.TextChannel):
     """Set the channel for sending leave messages."""
     if await permission_check(ctx):
-        await set_leave_message_channel(channel.id)
+        await set_channel_id("leave_channel", channel.name, channel.id)
         await ctx.send(f"Leave message channel set to {channel.mention}.")
 
 # Command: Show help information.
@@ -643,13 +614,15 @@ async def help(ctx):
 **Settings and Configuration Commands**
 - `/setwarnthreshold` | Set the warn threshold.
 - `/setwarnpunishment` | Set the punishment for crossing/meeting the warn threshold.
+- `/setmuterole` | Set the role to assign for muted members.
 - `/logging` | Set or toggle the logging channel.
 - `/setannouncementchannel` | Set the announcement channel.
+- `/setminorannouncementrole` | Set the minor announcement role.
 - `/setinvite` | Set the server invite link.
 - `/setjoinmessage` | Set the welcome message.
 - `/setleavemessage` | Set the leave message.
-- `/setjoinmessagechannel` | Set the channel for sending join messages.
-- `/setleavemeesagechannel` | Set the channel for sending leave messages.
+- `/setjoinchannel` | Set the channel for sending join messages.
+- `/setleavechannel` | Set the channel for sending leave messages.
 
 **Role Management Commands:**
 - `/addrole` | Add a role to a member.
