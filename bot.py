@@ -507,7 +507,7 @@ async def logging(ctx, channel: nextcord.TextChannel = None, toggle: bool = None
 
 # Command: Make an announcement.
 @bot.slash_command(description="Make an announcement.")
-async def announce(ctx, message: str, ping_everyone: bool = False, minor_announcement: bool = False):
+async def announce(ctx, message: str, ping_everyone: bool = False, minor_announcement: bool = False, testing_ping: bool = False):
     """Make an announcement."""
     if await permission_check(ctx):
         announcement_channel = await get_channel_id("announcement_channel")
@@ -515,16 +515,22 @@ async def announce(ctx, message: str, ping_everyone: bool = False, minor_announc
             announcement_channel = bot.get_channel(int(announcement_channel))
             if ping_everyone:
                 await announcement_channel.send("@everyone " + message)
-                await ctx.send("Announcement made successfully")
-            if minor_announcement:
-                minorannouncementrole = await get_role_id("minorannouncementrole")
-                await announcement_channel.send(f"<@&{minorannouncementrole}> " + message)
-                await ctx.send("Announcement made successfully")
+                await ctx.send("Announcement sent successfully")
             else:
-                await announcement_channel.send(message)
-                await ctx.send("Announcement made successfully")
-        else:
-            await ctx.send("Announcement channel is not set. Use /setannouncementchannel command to set it.")
+                if minor_announcement:
+                    minorannouncementrole = await get_role_id("minorannouncementrole")
+                    await announcement_channel.send(f"<@&{minorannouncementrole}> " + message)
+                    await ctx.send("Announcement sent successfully")
+                else:
+                    if testing_ping:
+                        testing_role = await get_role_id("testingrole")
+                        await announcement_channel.send(f"<@&{testing_role}> " + message)
+                        await ctx.send("Development announcement sent successfully")
+                    else:
+                        await announcement_channel.send(message)
+                        await ctx.send("Announcement sent successfully")
+    else:
+        await ctx.send("Announcement channel or minor announcement role is not set. Use /setannouncementchannel or /setminorannouncementrole command to set it.")
 
 # Command: Set the announcement channel.
 @bot.slash_command(description="Set the announcement channel.")
@@ -534,13 +540,21 @@ async def setannouncementchannel(ctx, channel: nextcord.TextChannel):
         await set_channel_id("announcement_channel", channel.name, channel.id)
         await ctx.send(f"Announcement channel set to {channel.mention}.")
 
-# Command: Set the announcement channel.
+# Command: Set the minor announcement role.
 @bot.slash_command(description="Set the minor announcement role.")
 async def setminorannouncementrole(ctx, role: nextcord.Role):
     """Set the minor announcement channel."""
     if await permission_check(ctx):
         await set_role_id("minorannouncementrole", role.name, role.id)
         await ctx.send(f"Minor announcement role set to {role.mention}.")
+
+# Command: Set the testing role channel.
+@bot.slash_command(description="Set the minor announcement role.")
+async def settestingrole(ctx, role: nextcord.Role):
+    """Set the minor announcement channel."""
+    if await permission_check(ctx):
+        await set_role_id("testingrole", role.name, role.id)
+        await ctx.send(f"Testing role set to {role.mention}.")
 
 # Command: Get server invite link
 @bot.slash_command(description="Get server invite link")
