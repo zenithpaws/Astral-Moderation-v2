@@ -1,6 +1,7 @@
 import os
 import nextcord
 import firebase_admin
+from nextcord import SlashOption
 from nextcord.ext import commands
 from firebase_admin import credentials, firestore
 from enum import Enum
@@ -71,7 +72,7 @@ async def set_role_id(str, role_name, role_id):
     except Exception as e:
         print(f"Error setting role ID: {e}")
 
-# Function to get the role id from Firestore
+# Function to get a role id from Firestore
 async def get_role_id(str):
     """Get the role id from Firestore."""
     try:
@@ -98,6 +99,69 @@ async def get_allowed_roles():
         print(f"Error fetching allowed roles: {e}")
 
     return allowed_roles
+
+async def apply_punishment(ctx, member: nextcord.Member, action: str):
+    """Apply the specified punishment to the member and log the action."""
+    guild = ctx.guild
+    reason = "Warn threshold reached."
+
+    if action == "mute":
+        # Ensure you have the necessary permissions and role for muting
+        mute_role = nextcord.utils.get(guild.roles, name="Muted")
+        if mute_role:
+            await member.add_roles(mute_role)
+            await ctx.send(f"{member.mention} has been muted.")
+            await log_events(ctx, f'{member.mention} has been muted for for reaching the warn threshold.')
+        else:
+            await ctx.send("Mute role not found.")
+    elif action == "kick":
+        try:
+            await member.kick(reason=reason)
+            await ctx.send(f"{member.mention} has been kicked.")
+            
+            # Log the kick event
+            await log_events(ctx, f"{member.mention} has been kicked for reaching the warn threshold.")
+            
+            # Store kick information in Firebase
+            try:
+                kicks_ref = db.collection("data").document("kicks")
+                kick_info = {
+                    member.display_name: {
+                        "user_id": str(member.id),
+                        "username": member.name,
+                        "kick_reason": reason
+                    }
+                }
+                kicks_ref.set(kick_info, merge=True)
+            except Exception as e:
+                print(f"Error storing kick information: {e}")
+                
+        except nextcord.Forbidden:
+            await ctx.send("I don't have permission to kick members.")
+    elif action == "ban":
+        try:
+            await member.ban(reason=reason)
+            await ctx.send(f"{member.mention} has been banned.")
+            
+            # Log the ban event
+            await log_events(ctx, f"{member.mention} has been banned for reaching the warn threshold.")
+            
+            # Store ban information in Firebase
+            try:
+                bans_ref = db.collection("data").document("bans")
+                ban_info = {
+                    member.display_name: {
+                        "user_id": str(member.id),
+                        "username": member.name,
+                        "ban_reason": reason
+                    }
+                }
+                bans_ref.set(ban_info, merge=True)
+            except Exception as e:
+                print(f"Error storing ban information: {e}")
+                
+        except nextcord.Forbidden:
+            await ctx.send("I don't have permission to ban members.")
 
 # Function to check the user for permissions to run the command
 async def permission_check(ctx):
@@ -135,17 +199,6 @@ def run_bot():
         bot.run(token)
     else:
         print("Failed to retrieve Firebase personal access token.")
-
-# Function to get the warn count of a member
-async def get_warn_count(member_id):
-    """Get the warn count for a member."""
-    warn_ref = db.collection("data").document("warns")
-    snapshot = warn_ref.get()
-    if snapshot.exists:
-        data = snapshot.to_dict()
-        if data and str(member_id) in data:
-            return data[str(member_id)].get("warn_count", 0)
-    return 0
 
 # Function to get the server invite link
 async def get_server_invite(ctx):
@@ -215,6 +268,7 @@ async def set_leave_message(message):
 # Event listener: Send join and leave messages
 @bot.event
 async def on_member_join(member: nextcord.Member):
+    # Get the join channel ID and join message
     join_channel_id = await get_channel_id("join_channel")
     if join_channel_id:
         join_channel = bot.get_channel(join_channel_id)
@@ -223,15 +277,38 @@ async def on_member_join(member: nextcord.Member):
             if join_message:
                 await join_channel.send(f"{member.mention} {join_message}")
 
+    # Get the role to add from Firestore
+    role_ref = db.collection("roles").document("join_role")
+    role_data = role_ref.get().to_dict() or {}
+    role_id = role_data.get("id")
+
+    if role_id:
+        role = nextcord.utils.get(member.guild.roles, id=int(role_id))
+        if role:
+            await member.add_roles(role)
+        else:
+            print(f"Role with ID {role_id} not found.")
+
 @bot.event
 async def on_member_remove(member: nextcord.Member):
     leave_channel_id = await get_channel_id("leave_channel")
     if leave_channel_id:
-        leave_channel = bot.get_channel("leave_channel")
+        leave_channel = bot.get_channel(leave_channel_id)
         if leave_channel:
             leave_message = await get_leave_message()
             if leave_message:
                 await leave_channel.send(f"{member.mention} {leave_message}")
+
+def get_warn_info(member_id, warns_data):
+    """Retrieve warning info for a specific member."""
+    warnings = warns_data.get(member_id, [])
+    if not warnings:
+        return f"Username & User ID | Unknown - {member_id}\nWarns | No warnings found"
+
+    reasons = [warn["reason"] for warn in warnings]
+    reason_list = ", ".join(reasons)
+    username = warnings[0].get("username", "Unknown")  # Assuming the username is the same for all warnings
+    return f"Username & User ID | {username} - {member_id}\nWarns | {reason_list}"
 
 # Function to log ran commands
 async def log_events(ctx, message):
@@ -343,53 +420,110 @@ async def kick(ctx, member: nextcord.Member, *, reason=None):
         await ctx.send(f'{member.mention} has been kicked.')
         await log_events(ctx, f'{member.mention} has been kicked for {reason}.')
 
-# Command: Warn a member
 @bot.slash_command(description="Warn a member.")
 async def warn(ctx, member: nextcord.Member, reason: str):
     """Warn a member."""
     if await permission_check(ctx):
         warn_ref = db.collection("data").document("warns")
         member_id = str(member.id)
-        warns_data = warn_ref.get()
+        warns_data = warn_ref.get().to_dict() or {}
 
-        if warns_data.exists and member_id in warns_data.to_dict():
-            member_warns = warns_data.to_dict()[member_id].get("warns", [])
-            warn_count = len(member_warns) + 1
-            member_warns.append({"reason": reason, "warn_count": warn_count, "username": member.name, "user_id": member.id})
-        else:
-            warn_count = 1
-            member_warns = [{"reason": reason, "warn_count": warn_count, "username": member.name, "user_id": member.id}]
+        # Initialize or update the warnings
+        member_warns = warns_data.get(member_id, [])
+        
+        warn_details = {
+            "reason": reason,
+            "warn_number": len(member_warns) + 1,
+            "username": member.name,
+            "warned_by": ctx.user.name
+        }
+        member_warns.append(warn_details)
 
-        warn_ref.set({member_id: {"warns": member_warns}}, merge=True)
-        warn_ref.update({f"{member_id}.warn_count": warn_count})
+        # Update the Firestore document
+        warn_ref.set({member_id: member_warns}, merge=True)
 
+        # Check if the threshold is met or exceeded
+        warn_threshold = await get_setting("warn_threshold")
+        punishment_action = await get_setting("punishment_action")
+
+        if len(member_warns) >= warn_threshold:
+            if punishment_action:
+                await apply_punishment(ctx, member, punishment_action)
+
+        # Notify the user and log the event
         await ctx.send(f'{member.mention} has been warned for {reason}.')
         await log_events(ctx, f'{member.mention} has been warned for {reason}.')
-
 # Command: View all warnings for the server
 @bot.slash_command(description="View all warnings for the server.")
 async def serverwarns(ctx):
-    """View all warnings for the server."""
-    if await permission_check(ctx, "serverwarns"):
-        server_warns = await get_server_warns(ctx.guild)
-        await ctx.send(server_warns)
+    """Get all warnings for the server."""
+    warn_ref = db.collection("data").document("warns")
+    warns_data = warn_ref.get().to_dict() or {}
+
+    if not warns_data:
+        await ctx.send("No warnings found.")
+        return
+
+    report = [get_warn_info(member_id, warns_data) for member_id in warns_data]
+    await ctx.send("\n\n".join(report))
+
+@bot.slash_command(description="Clear all warnings")
+async def clearserverwarns(ctx):
+    """Clear all warnings for all members in the server."""
+    if await permission_check(ctx):
+        warn_ref = db.collection("data").document("warns")
+
+        # Clear all warnings
+        warn_ref.set({})
+
+        await ctx.send("All warnings have been cleared.")
+        await log_events(ctx, "All warnings have been cleared.")
 
 # Command: View warns for a member
 @bot.slash_command(description="View warns for a member.")
 async def warns(ctx, member: nextcord.Member):
-    """View warns for a member."""
-    if await permission_check(ctx):
-        member_warns = await get_member_warns(member)
-        await ctx.send(member_warns)
+    """Get warnings for a specific member."""
+    warn_ref = db.collection("data").document("warns")
+    warns_data = warn_ref.get().to_dict() or {}
 
-# Command: Clear warns for a member
-@bot.slash_command(description="Clear warns for a member.")
-async def clearwarns(ctx, member: nextcord.Member):
-    """Clear warns for a member."""
+    member_id = str(member.id)
+    if member_id not in warns_data:
+        await ctx.send(f"No warnings found for {member.name}.")
+        return
+
+    await ctx.send(get_warn_info(member_id, warns_data))
+
+@bot.slash_command(description="Remove a specific warning for a member.")
+async def unwarn(ctx, member: nextcord.Member, warn_number: int):
+    """Remove a specific warning for a member based on warn number."""
     if await permission_check(ctx):
-        await clear_member_warns(member)
-        await ctx.send(f'Warns cleared for {member.mention}.')
-        await log_events(ctx, f'Warns cleared for {member.mention}.')
+        warn_ref = db.collection("data").document("warns")
+        member_id = str(member.id)
+        warns_data = warn_ref.get().to_dict() or {}
+
+        if member_id not in warns_data:
+            await ctx.send(f"No warnings found for {member.mention}.")
+            return
+        
+        member_warns = warns_data[member_id]
+        
+        # Check if the warn number is valid
+        if warn_number < 1 or warn_number > len(member_warns):
+            await ctx.send(f"Invalid warning number {warn_number} for {member.mention}.")
+            return
+        
+        # Update the warn numbers for remaining warnings
+        for i, warn in enumerate(member_warns):
+            warn["warn_number"] = i + 1
+        
+        # Update the Firestore document
+        if member_warns:
+            warn_ref.set({member_id: member_warns}, merge=True)
+        else:
+            warn_ref.update({member_id: firestore.DELETE_FIELD})
+
+        await ctx.send(f"Warning number {warn_number} for {member.mention} has been removed.")
+        await log_events(ctx, f"Warning number {warn_number} for {member.mention} has been removed.")
 
 # Command: Set warn threshold
 @bot.slash_command(description="Set the warn threshold.")
@@ -399,13 +533,12 @@ async def setwarnthreshold(ctx, threshold: int):
         await set_setting("warn_threshold", threshold)
         await ctx.send(f"Warn threshold set to {threshold}.")
 
-# Command: Set punishment for crossing or meeting the warn threshold
-@bot.slash_command(description="Set the punishment for crossing/meeting the warn threshold. Options: mute, kick, ban")
-async def setwarnpunishment(ctx, action: str):
-    """Set the punishment for crossing/meeting the warn threshold."""
+@bot.slash_command(description="Set the punishment for meeting the warn threshold.")
+async def setwarnpunishment(ctx, action: str = SlashOption(choices=["mute", "kick", "ban"])):
+    """Set the punishment for meeting the warn threshold."""
     if await permission_check(ctx):
         await set_setting("punishment_action", action.lower())
-        await ctx.send(f"Punishment for crossing/meeting the warn threshold set to {action}.")
+        await ctx.send(f"Punishment for meeting the warn threshold set to {action}.")
 
 # Command: Mute a member
 @bot.slash_command(description="Mute a member to prevent them from sending messages.")
@@ -426,7 +559,7 @@ async def unmute(ctx, member: nextcord.Member):
         await log_events(ctx, f'{member.mention} has been unmuted.')
 
 # Command: Set the announcement channel.
-@bot.slash_command(description="Set the minor announcement role.")
+@bot.slash_command(description="Set the mute role.")
 async def setmuterole(ctx, role: nextcord.Role):
     """Set the minor announcement channel."""
     if await permission_check(ctx):
@@ -478,8 +611,8 @@ async def addrole(ctx, member: nextcord.Member, role: nextcord.Role):
     """Add a role to a member."""
     if await permission_check(ctx):
         await member.add_roles(role)
-        await ctx.send(f'{member.mention} has been given the {role.name} role.')
-        await log_events(ctx, f'{member.mention} has been given the {role.name} role.')
+        await ctx.send(f'{member.mention} has been given the {role.mention} role.')
+        await log_events(ctx, f'{member.mention} has been given the {role.mention} role.')
 
 # Command: Remove role from a member
 @bot.slash_command(description="Remove a role from a member.")
@@ -487,8 +620,8 @@ async def removerole(ctx, member: nextcord.Member, role: nextcord.Role):
     """Remove a role from a member."""
     if await permission_check(ctx):
         await member.remove_roles(role)
-        await ctx.send(f'{member.mention} no longer has the {role.name} role.')
-        await log_events(ctx, f'{member.mention} no longer has the {role.name} role.')
+        await ctx.send(f'{member.mention} no longer has the {role.mention} role.')
+        await log_events(ctx, f'{member.mention} no longer has the {role.mention} role.')
 
 # Command: Set or toggle the logging channel.
 @bot.slash_command(description="Set or toggle the logging channel.")
@@ -518,12 +651,12 @@ async def announce(ctx, message: str, ping_everyone: bool = False, minor_announc
                 await ctx.send("Announcement sent successfully")
             else:
                 if minor_announcement:
-                    minorannouncementrole = await get_role_id("minorannouncementrole")
-                    await announcement_channel.send(f"<@&{minorannouncementrole}> " + message)
+                    minorannouncement_role = await get_role_id("minorannouncement_role")
+                    await announcement_channel.send(f"<@&{minorannouncement_role}> " + message)
                     await ctx.send("Announcement sent successfully")
                 else:
                     if testing_ping:
-                        testing_role = await get_role_id("testingrole")
+                        testing_role = await get_role_id("testing_role")
                         await announcement_channel.send(f"<@&{testing_role}> " + message)
                         await ctx.send("Development announcement sent successfully")
                     else:
@@ -545,15 +678,15 @@ async def setannouncementchannel(ctx, channel: nextcord.TextChannel):
 async def setminorannouncementrole(ctx, role: nextcord.Role):
     """Set the minor announcement channel."""
     if await permission_check(ctx):
-        await set_role_id("minorannouncementrole", role.name, role.id)
+        await set_role_id("minorannouncement_role", role.name, role.id)
         await ctx.send(f"Minor announcement role set to {role.mention}.")
 
 # Command: Set the testing role channel.
-@bot.slash_command(description="Set the minor announcement role.")
+@bot.slash_command(description="Set the testing and development role.")
 async def settestingrole(ctx, role: nextcord.Role):
-    """Set the minor announcement channel."""
+    """Set the testing and development role."""
     if await permission_check(ctx):
-        await set_role_id("testingrole", role.name, role.id)
+        await set_role_id("testing_role", role.name, role.id)
         await ctx.send(f"Testing role set to {role.mention}.")
 
 # Command: Get server invite link
@@ -574,22 +707,6 @@ async def setinvite(ctx, invite: str):
         except Exception as e:
             await ctx.send(f"Error setting server invite link: {str(e)}")
 
-# Command: Set welcome message
-@bot.slash_command(description="Set the welcome message.")
-async def setjoinmessage(ctx, message: str):
-    """Set the welcome message."""
-    if await permission_check(ctx):
-        await set_join_message(message)
-        await ctx.send("Welcome message set successfully.")
-
-# Command: Set leave message
-@bot.slash_command(description="Set the leave message.")
-async def setleavemessage(ctx, message: str):
-    """Set the leave message."""
-    if await permission_check(ctx):
-        await set_leave_message(message)
-        await ctx.send("Leave message set successfully.")
-
 # Command: Set join message channel
 @bot.slash_command(description="Set the channel for sending join messages.")
 async def setjoinchannel(ctx, channel: nextcord.TextChannel):
@@ -606,6 +723,55 @@ async def setleavechannel(ctx, channel: nextcord.TextChannel):
         await set_channel_id("leave_channel", channel.name, channel.id)
         await ctx.send(f"Leave message channel set to {channel.mention}.")
 
+# Command: Set welcome message
+@bot.slash_command(description="Set the welcome message.")
+async def setjoinmessage(ctx, message: str):
+    """Set the welcome message."""
+    if await permission_check(ctx):
+        await set_join_message(message)
+        await ctx.send("Welcome message set successfully.")
+
+# Command: Get join message
+@bot.slash_command(description="Get the join message.")
+async def getjoinmessage(ctx):
+    """Get the join message."""
+    if await permission_check(ctx):
+        join_message = await get_join_message()
+        if join_message:
+            await ctx.send(f"Current join message:\n{join_message}")
+        else:
+            await ctx.send("Join message is not set.")
+
+# Command: Set leave message
+@bot.slash_command(description="Set the leave message.")
+async def setleavemessage(ctx, message: str):
+    """Set the leave message."""
+    if await permission_check(ctx):
+        await set_leave_message(message)
+        await ctx.send("Leave message set successfully.")
+
+# Command: Get leave message
+@bot.slash_command(description="Get the leave message.")
+async def getleavemessage(ctx):
+    """Get the leave message."""
+    if await permission_check(ctx):
+        leave_message = await get_leave_message()
+        if leave_message:
+            await ctx.send(f"Current leave message:\n{leave_message}")
+        else:
+            await ctx.send("Leave message is not set.")
+
+@bot.slash_command(description="Set the role to be added when a member joins.")
+async def setjoinrole(ctx, role: nextcord.Role):
+    """Set the role to be added when a member joins."""
+    if await permission_check(ctx):
+        role_ref = db.collection("roles").document("join_role")
+        
+        # Update or set the role ID in Firestore
+        role_ref.set({"id": str(role.id)}, merge=True)
+
+        await ctx.send(f"The join role has been set to {role.mention}.")
+
 # Command: Show help information.
 @bot.slash_command(description="Show help information.")
 async def help(ctx):
@@ -617,8 +783,9 @@ async def help(ctx):
 - `/kick` | Kick a member from the server.
 - `/warn` | Warn a member.
 - `/serverwarns` | View all warnings for the server.
+- `/clearserverwarns` | Clear all warnings for the server.
 - `/warns` | View warns for a member.
-- `/clearwarns` | Clear warns for a member.
+- `/unwarn` | Clear warns for a member.
 - `/mute` | Mute a member to prevent them from sending messages.
 - `/unmute` | Unmute a member to allow them to send messages again.
 - `/lock` | Lock a channel to prevent members from sending messages.
@@ -637,6 +804,7 @@ async def help(ctx):
 - `/setleavemessage` | Set the leave message.
 - `/setjoinchannel` | Set the channel for sending join messages.
 - `/setleavechannel` | Set the channel for sending leave messages.
+- `/setjoinrole` | Set the role added to members upon joining
 
 **Role Management Commands:**
 - `/addrole` | Add a role to a member.

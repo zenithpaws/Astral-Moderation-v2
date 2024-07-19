@@ -6,7 +6,6 @@
 - Fixed announcements being sent twice when pinging everyone
 - Added new announcement option for testing
 
-
 ## Commands
 
 **Additions**
