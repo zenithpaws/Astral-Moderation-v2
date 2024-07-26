@@ -3,10 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Astral Moderation Control Panel</title>
+    <title>Astral Moderation Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #0044cc;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            color: white;
+            background-color: #007bff;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
-    <h1>Astral Moderation Control Panel</h1>
+    <h1>Astral Moderation Dashboard</h1>
     <form action="/start" method="get">
         <button type="submit">Start Bot</button>
     </form>
@@ -25,5 +65,115 @@
     <form action="/systemshutdown" method="get">
         <button type="submit">Shutdown System</button>
     </form>
+
+    <h2>System Status</h2>
+    <table>
+        <tr>
+            <th>Metric</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>CPU Usage</td>
+            <td id="cpu-usage">Loading...</td>
+        </tr>
+        <tr>
+            <td>Memory Usage</td>
+            <td id="memory-usage">Loading...</td>
+        </tr>
+        <tr>
+            <td>Disk Usage</td>
+            <td id="disk-used">Loading...</td>
+        </tr>
+        <tr>
+            <td>Network Upload</td>
+            <td id="network-upload">Loading...</td>
+        </tr>
+        <tr>
+            <td>Network Download</td>
+            <td id="network-download">Loading...</td>
+        </tr>
+    </table>
+
+    <h2>Firebase Data</h2>
+    <table>
+        <tr>
+            <th>Category</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>Join Message</td>
+            <td id="join-message">Loading...</td>
+        </tr>
+        <tr>
+            <td>Leave Message</td>
+            <td id="leave-message">Loading...</td>
+        </tr>
+        <tr>
+            <td>Logging Enabled</td>
+            <td id="logging">Loading...</td>
+        </tr>
+        <tr>
+            <td>Warn Threshold</td>
+            <td id="warn-threshold">Loading...</td>
+        </tr>
+        <tr>
+            <td>Current Warnings</td>
+            <td id="current-warnings">Loading...</td>
+        </tr>
+        <tr>
+            <td>Current Bans</td>
+            <td id="current-bans">Loading...</td>
+        </tr>
+    </table>
+
+    <script>
+        function fetchSystemStatus() {
+            fetch('/systemstatus')
+                .then(response => {
+                    console.log('System Status Response Status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('System Status Data:', data);
+                    document.getElementById('cpu-usage').textContent = data.cpu_usage ? data.cpu_usage.toFixed(2) + '%' : 'Error';
+                    document.getElementById('memory-usage').textContent = data.memory_usage ? data.memory_usage.toFixed(2) + '%' : 'Error';
+                    document.getElementById('disk-used').textContent = data.disk_used ? data.disk_used.toFixed(2) + '%' : 'Error';
+                    document.getElementById('network-upload').textContent = data.network_upload ? data.network_upload.toFixed(2) + ' MB/s' : 'Error';
+                    document.getElementById('network-download').textContent = data.network_download ? data.network_download.toFixed(2) + ' MB/s' : 'Error';
+                })
+                .catch(error => console.error('Error fetching system status:', error));
+        }
+    
+        function fetchFirebaseData() {
+            fetch('/firebasedata')
+                .then(response => {
+                    console.log('Firebase Data Response Status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Firebase Data:', data);
+                    document.getElementById('join-message').textContent = data.settings.join_message || 'None';
+                    document.getElementById('leave-message').textContent = data.settings.leave_message || 'None';
+                    document.getElementById('logging').textContent = data.settings.logging ? 'Enabled' : 'Disabled';
+                    document.getElementById('warn-threshold').textContent = data.settings.warn_threshold || 'Not Set';
+                    document.getElementById('current-warnings').textContent = data.warnings || 'None';
+                    document.getElementById('current-bans').textContent = data.bans || 'None';
+                })
+                .catch(error => console.error('Error fetching Firebase data:', error));
+        }
+    
+        fetchSystemStatus(); // Initial fetch
+        setInterval(fetchSystemStatus, 1000); // Update every second
+    
+        fetchFirebaseData(); // Initial fetch
+        setInterval(fetchFirebaseData, 1000); // Update every second
+    </script>
+
 </body>
 </html>
