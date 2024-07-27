@@ -84,6 +84,23 @@ async def get_role_id(str):
         print(f"Error getting role id: {e}")
     return None
 
+# Function to set what roles are allowed to run commands
+async def set_allowed_role(role_name: str, allow: bool):
+    """Set allowed roles in Firestore."""
+    try:
+        doc_ref = db.collection('roles').document('allowed_commands')
+        doc = doc_ref.get()
+
+        if doc.exists:
+            data = doc.to_dict()
+        else:
+            data = {}
+
+        data[role_name] = allow
+        doc_ref.set(data)
+    except Exception as e:
+        print(f"Error setting allowed role: {e}")
+
 # Function to check what roles are allowed to run commands
 async def get_allowed_roles():
     """Retrieve allowed roles from Firestore."""
@@ -222,6 +239,29 @@ async def set_server_invite(invite_data):
         invite_ref.set({"link": invite_data})
     except Exception as e:
         print(f"Error setting server invite: {e}")
+
+# Function to get the server invite link
+async def get_github_repo(ctx):
+    """Get the server invite link from Firestore."""
+    try:
+        invite_ref = db.collection("secrets").document("github_repo")
+        snapshot = invite_ref.get()
+        if snapshot.exists:
+            return snapshot.to_dict().get("link")
+        else:
+            return None
+    except Exception as e:
+        print(f"Error getting GitHub Repository: {e}")
+        return None
+
+# Function to set the server invite link
+async def set_github_repo(invite_data):
+    """Set the GitHub Repository link in Firestore."""
+    try:
+        invite_ref = db.collection("secrets").document("github_repo")
+        invite_ref.set({"link": invite_data})
+    except Exception as e:
+        print(f"Error setting GitHub Repository: {e}")
 
 # Function to get welcome message from Firestore
 async def get_join_message():
@@ -601,9 +641,9 @@ async def purge(ctx, amount: int, member: nextcord.Member = None):
             await ctx.send(f'{len(deleted)} messages from {member.mention} have been purged from the channel.')
             await log_events(ctx, f'{len(deleted)} messages from {member.mention} have been purged from {ctx.channel.mention}.')
         else:
-            deleted = await ctx.channel.purge(limit=amount + 1)
-            await ctx.send(f'{len(deleted) - 1} messages have been purged from the channel.')
-            await log_events(ctx, f'{len(deleted) - 1} messages have been purged from {ctx.channel.mention}.')
+            deleted = await ctx.channel.purge(limit=amount)
+            await ctx.send(f'{len(deleted)} messages have been purged from the channel.')
+            await log_events(ctx, f'{len(deleted)} messages have been purged from {ctx.channel.mention}.')
 
 # Command: Add role to a member
 @bot.slash_command(description="Add a role to a member.")
@@ -622,6 +662,19 @@ async def removerole(ctx, member: nextcord.Member, role: nextcord.Role):
         await member.remove_roles(role)
         await ctx.send(f'{member.mention} no longer has the {role.mention} role.')
         await log_events(ctx, f'{member.mention} no longer has the {role.mention} role.')
+
+# Command: Set roles allowed to use commands
+@bot.slash_command(description="Set roles allowed to use commands.")
+async def setcommandrole(ctx, role: nextcord.Role, allow: bool):
+    """Set a role to be allowed or disallowed for commands."""
+    if await permission_check(ctx):
+        try:
+            await set_allowed_role(role.name, allow)
+            status = 'allowed' if allow else 'not allowed'
+            await ctx.send(f'{role.mention} {status} commands.')
+            await log_events(ctx, f'{role.mention} {status} commands.')
+        except Exception as e:
+            await ctx.send(f'Error setting role: {e}')
 
 # Command: Set or toggle the logging channel.
 @bot.slash_command(description="Set or toggle the logging channel.")
@@ -706,6 +759,24 @@ async def setinvite(ctx, invite: str):
             await ctx.send("Server invite link has been set")
         except Exception as e:
             await ctx.send(f"Error setting server invite link: {str(e)}")
+
+# Command: Get GitHub Repository link
+@bot.slash_command(description="Get GitHub Repository link")
+async def githubrepo(ctx):
+    """Get server invite link"""
+    github_repo = await get_github_repo(ctx)
+    await ctx.send(github_repo)
+
+# Command: Set the GitHub Repository link
+@bot.slash_command(description="Set the GitHub Repository link")
+async def setgithubrepo(ctx, link: str):
+    """Set the GitHub Repository link"""
+    if await permission_check(ctx):
+        try:
+            await set_github_repo(link)
+            await ctx.send("GitHub Repository link has been set")
+        except Exception as e:
+            await ctx.send(f"Error setting GitHub Repository link: {str(e)}")
 
 # Command: Set join message channel
 @bot.slash_command(description="Set the channel for sending join messages.")
