@@ -1,8 +1,8 @@
 .mypy_cache
+.venv
 .vscode
-firebase.json
-.DS_Store
-pid.txt
 Experimental & Testing
-pythonvenv
 Astral-Moderation-v2.code-workspace
+.DS_Store
+firebase.json
+pid.txt
