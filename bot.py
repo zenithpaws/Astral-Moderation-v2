@@ -1,7 +1,7 @@
 import os
 import nextcord
 import firebase_admin
-from nextcord import SlashOption
+from nextcord import SlashOption, Embed
 from nextcord.ext import commands
 from firebase_admin import credentials, firestore
 from enum import Enum
@@ -451,6 +451,48 @@ async def unban(ctx, *, member):
         except Exception as e:
             print(f"Error fetching ban information: {e}")
 
+import nextcord
+from nextcord import Embed
+
+# Command: List banned members and their reasons
+@bot.slash_command(description="List banned members and their reasons.")
+async def banlist(ctx):
+    """List banned members and their ban reasons from Firebase."""
+    try:
+        # Fetch the 'bans' document from the 'data' collection
+        bans_ref = db.collection("data").document("bans")
+        bans_doc = bans_ref.get()
+
+        if bans_doc.exists:
+            bans_data = bans_doc.to_dict()
+            if not bans_data:
+                await ctx.send("No members are currently banned.")
+                return
+
+            # Create the embed
+            embed = Embed(title="**Banned Members List**", color=nextcord.Color.red())
+
+            # Add each banned member's info with reason
+            for username, ban_info in bans_data.items():
+                ban_reason = ban_info.get("ban_reason", "No reason provided.")
+                user_id = ban_info.get("user_id", "Unknown ID")
+                user_mention = f"<@{user_id}>"  # Add user mention here
+
+                # Format each banned member's entry without the "Banned By" field
+                embed.add_field(
+                    name=f"**{username}**",
+                    value=f"Mention: {user_mention} | User ID: `{user_id}`\n"
+                        f"Reason: {ban_reason}",
+                    inline=False
+                )
+
+            # Send the embed message
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("No members are currently banned.")
+    except Exception as e:
+        await ctx.send(f"An error occurred while fetching the ban list: {e}")
+
 # Command: Kick a member
 @bot.slash_command(description="Kick a member from the server.")
 async def kick(ctx, member: nextcord.Member, *, reason=None):
@@ -493,6 +535,7 @@ async def warn(ctx, member: nextcord.Member, reason: str):
         # Notify the user and log the event
         await ctx.send(f'{member.mention} has been warned for {reason}.')
         await log_events(ctx, f'{member.mention} has been warned for {reason}.')
+
 # Command: View all warnings for the server
 @bot.slash_command(description="View all warnings for the server.")
 async def serverwarns(ctx):
@@ -504,8 +547,31 @@ async def serverwarns(ctx):
         await ctx.send("No warnings found.")
         return
 
-    report = [get_warn_info(member_id, warns_data) for member_id in warns_data]
-    await ctx.send("\n\n".join(report))
+    # Create the embed
+    embed = Embed(title="**Server Warnings List**", color=nextcord.Color.red())
+
+    # Build the report list with each member's warnings
+    for member_id, warns in warns_data.items():
+        username = warns[0].get("username", "Unknown User")
+        user_mention = f"<@{member_id}>"  # Correct mention format
+        user_id = member_id  # User ID directly from member_id
+        
+        # Start the member's entry with their username and ID, labeled
+        member_info = f"**{username}**\nMention: {user_mention} | User ID: `{user_id}`"
+
+        # For each warning, add the reason and who warned, with separation between each warning
+        for warn in warns:
+            warn_reason = warn.get("reason", "No reason provided")
+            warned_by = warn.get("warned_by", "Unknown")
+            
+            # Add the reason and warned by to the member's entry, separated by blank lines
+            member_info += f"\n  Reason: {warn_reason}\n  Warned By: {warned_by}\n"
+
+        # Add the formatted member's entry directly without a title
+        embed.add_field(name="\u200b", value=member_info, inline=False)  # Use invisible character for the field name
+
+    # Send the embed message with the warnings
+    await ctx.send(embed=embed)
 
 @bot.slash_command(description="Clear all warnings")
 async def clearserverwarns(ctx):
@@ -531,7 +597,29 @@ async def warns(ctx, member: nextcord.Member):
         await ctx.send(f"No warnings found for {member.name}.")
         return
 
-    await ctx.send(get_warn_info(member_id, warns_data))
+    # Create the embed
+    embed = Embed(title=f"Warnings for {member.name}", color=nextcord.Color.red())
+
+    # Build the formatted member entry
+    user_mention = f"<@{member_id}>"
+    user_id = member_id  # User ID directly from member_id
+
+    # Add the username, mention, and user ID at the top
+    member_entry = f"{member.name}\nMention: {user_mention} | User ID: `{user_id}`"
+
+    # For each warning, add the reason and who warned, with spacing between each warning
+    for warn in warns_data[member_id]:
+        warn_reason = warn.get("reason", "No reason provided")
+        warned_by = warn.get("warned_by", "Unknown")
+        
+        # Add each warning's details to the entry
+        member_entry += f"\n  Reason: {warn_reason}\n  Warned By: {warned_by}\n"
+
+    # Add the formatted entry to the embed
+    embed.add_field(name="\u200b", value=member_entry, inline=False)
+
+    # Send the embed message with the warnings
+    await ctx.send(embed=embed)
 
 @bot.slash_command(description="Remove a specific warning for a member.")
 async def unwarn(ctx, member: nextcord.Member, warn_number: int):
@@ -850,6 +938,7 @@ async def help(ctx):
     await ctx.send(
 """**Moderation Commands:**
 - `/ban` | Ban a member from the server.
+- `/banlist` | View all banned members and their reasons.
 - `/unban` | Unban a member from the server.
 - `/kick` | Kick a member from the server.
 - `/warn` | Warn a member.
