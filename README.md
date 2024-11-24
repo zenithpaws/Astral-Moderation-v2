@@ -1,6 +1,6 @@
 # Discord Bot
 
-A powerful and customizable Discord bot built with [Nextcord](https://github.com/nextcord/nextcord) and integrated with Firestore for persistent data storage. This bot includes features for moderation, utility commands, and automated server management.
+A powerful and customizable Discord bot built with [Nextcord](https://nextcord.dev/) and integrated with Firestore for persistent data storage. This bot includes features for moderation, utility commands, and automated server management.
 
 ---
 
