@@ -73,7 +73,7 @@ A powerful and customizable Discord bot built with [Nextcord](https://github.com
    ```bash
    git clone https://github.com/zenithpaws/Astral-Moderation-v2
    cd Astral-Moderation-v2
-
+   ```
 
 2. **Add Firebase Credentials**
    Place your `firebase.json` file in the root directory of the project.
@@ -122,7 +122,6 @@ The bot supports a wide range of slash commands. Below are some highlights:
 ## Directory Structure
 
 ```plaintext
-.
 ├── bot.py                # Main bot script
 ├── firebase.json         # Firebase Admin SDK credentials
 ├── requirements.txt      # Python dependencies
@@ -153,5 +152,5 @@ This project is licensed under the MIT License.
 
 ## Additonal Notes
 
-* Only setup the collections and documents in these instructions, any other fields that will be needed are created when you set them using the bot's commands
+* Only setup the collections and documents in these instructions, other fields needed for storing settings and info are created when you set them using the bot's commands
 * When setting up the `allowed_commands` document in `roles` collection, don't  specifiy roles that shouldn't be allowed to run commands, only specifiy the roles that **should**
