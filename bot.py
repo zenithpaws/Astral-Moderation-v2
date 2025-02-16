@@ -199,8 +199,8 @@ async def permission_check(ctx):
 
 # Function to get the bot token from Firestore
 def get_bot_token():
-    # Assuming the personal access token is stored in a document named 'bot_token'
-    token_ref = db.collection("secrets").document("bot_token")
+    # Assuming the personal access token is stored in a document named 'token'
+    token_ref = db.collection("secrets").document("token")
     token_doc = token_ref.get()
     if token_doc.exists:
         return token_doc.to_dict().get("token")

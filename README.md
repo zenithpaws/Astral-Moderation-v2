@@ -50,7 +50,7 @@ A powerful and customizable Discord bot built with [Nextcord](https://nextcord.d
    #### Step 4: Set Up Firestore Collections
    - In the Firestore database, create the following collections and documents to store bot settings:
      1. **Collection:** `secrets`
-        - Document: `bot_token`
+        - Document: `token`
           - Field: `token` (String) → Add your bot token here.
         - Document: `server_invite` *(Optional)*
           - Field: `link` (String) → Add your server invite link.
@@ -80,7 +80,7 @@ A powerful and customizable Discord bot built with [Nextcord](https://nextcord.d
 
 3. **Configure Firestore**
    - Add the following keys to the Firestore database under the collection `secrets`:
-     - `bot_token`: Your bot token from the Discord Developer Portal.
+     - `token`: Your bot token from the Discord Developer Portal.
      - `server_invite` (optional): Your server's invite link.
      - `github_repo` (optional): A link to your bot's GitHub repository.
 
