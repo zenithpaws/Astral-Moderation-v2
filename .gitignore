@@ -1,0 +1,9 @@
+.mypy_cache
+.venv
+.vscode
+Experimental & Testing
+Astral-Moderation-v2.code-workspace
+.DS_Store
+pid.txt
+/astral
+/astral-public

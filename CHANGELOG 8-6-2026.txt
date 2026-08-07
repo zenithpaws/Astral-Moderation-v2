@@ -1,0 +1,22 @@
+# Astral Moderation 8/6/2026 Changelog
+
+## Summary
+
+* Added database management commands
+* Implemented real-time free tier Firestore storage usage calculation
+* Added bot invite link configuration support
+* Updated help command menu
+
+## Commands
+
+**Additions**
+
+* Added `/databasestats` command to calculate Firestore storage usage and document counts
+
+## Functions
+
+**Additions**
+
+* Added `estimate_doc_size` helper function to estimate field byte sizes
+* Added `get_bot_invite` function
+* Added `set_bot_invite` function
