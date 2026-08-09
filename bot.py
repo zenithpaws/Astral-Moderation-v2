@@ -788,20 +788,22 @@ async def setcommandrole(ctx, role: nextcord.Role, allow: bool):
         except Exception as e:
             await ctx.send(f'Error setting role: {e}')
 
-# Command: Set or toggle the logging channel.
 @bot.slash_command(description="Set or toggle the logging channel.")
 async def logging(ctx, channel: nextcord.TextChannel = None, toggle: bool = None):
     """Set or toggle the logging channel."""
     if await permission_check(ctx):
+        if channel is None and toggle is None:
+            await ctx.send("Invalid command usage. Please specify a channel, toggle status, or both.")
+            return
+
         if channel:
             await set_channel_id("logging_channel", channel.name, channel.id)
             await ctx.send(f"Logging channel set to {channel.mention}.")
-        elif toggle is not None:
+
+        if toggle is not None:  # Runs independently for both True and False
             await set_setting("logging", toggle)
             status = "enabled" if toggle else "disabled"
             await ctx.send(f"Logging is now {status}.")
-        else:
-            await ctx.send("Invalid command usage.")
 
 # Command: Make an announcement.
 @bot.slash_command(description="Make an announcement.")
