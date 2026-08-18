@@ -1,5 +1,6 @@
 import os
 import sys
+from aiohttp import web
 import nextcord
 import firebase_admin
 from nextcord import SlashOption, Embed
@@ -21,6 +22,26 @@ intents = nextcord.Intents.all()
 intents.messages = True
 intents.message_content = True  # Enable MESSAGE_CONTENT intent
 bot = commands.Bot(command_prefix=prefix, intents=intents)
+
+# --- HEALTH CHECK WEB SERVER SETUP ---
+async def health_check(request):
+    """Health check endpoint for Railway/Nightbell monitoring."""
+    return web.Response(text="OK", status=200)
+
+async def start_web_server():
+    """Starts a lightweight web server on the port assigned by Railway."""
+    app = web.Application()
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    
+    # Railway automatically injects PORT into environment variables
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"Health check web server active on port {port} :3")
 
 # Initialize Firebase
 cred = credentials.Certificate("firebase.json")
@@ -393,6 +414,7 @@ class ApplicationCommandOptionType(Enum):
 async def on_ready():
     print(f'{bot.user} is now online')
     await bot.change_presence(status=nextcord.Status.online)
+    await start_web_server()  # Launch web server for Railway health checks
 
 # Command: Ban a member
 @bot.slash_command(description="Ban a member from the server.")
@@ -474,9 +496,6 @@ async def unban(ctx, *, member):
             await ctx.send("User not found in the ban list.")
         except Exception as e:
             print(f"Error fetching ban information: {e}")
-
-import nextcord
-from nextcord import Embed
 
 # Command: List banned members and their reasons
 @bot.slash_command(description="List banned members and their reasons.")
@@ -1106,6 +1125,6 @@ async def help(ctx):
 **General Commands:**
 - `/help` | Show help information.""")
 
-                # Call the run_bot function to start the bot
+# Call the run_bot function to start the bot
 if __name__ == "__main__":
     run_bot()
