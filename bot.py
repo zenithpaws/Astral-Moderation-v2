@@ -501,33 +501,41 @@ async def unban(ctx, *, member):
 @bot.slash_command(description="List banned members and their reasons.")
 async def banlist(ctx):
     """List banned members and their ban reasons from Firebase."""
-    try:
-        # Fetch the 'bans' document from the 'data' collection
-        bans_ref = db.collection("data").document("bans")
-        bans_doc = bans_ref.get()
+    if await permission_check(ctx):
+        try:
+            # Fetch the 'bans' document from the 'data' collection
+            bans_ref = db.collection("data").document("bans")
+            bans_doc = bans_ref.get()
 
-        if bans_doc.exists:
-            bans_data = bans_doc.to_dict()
-            if not bans_data:
+            if bans_doc.exists:
+                bans_data = bans_doc.to_dict()
+                if not bans_data:
+                    await ctx.send("No members are currently banned.")
+                    return
+
+                # Create the embed
+                embed = Embed(title="**Banned Members List**", color=nextcord.Color.red())
+
+                # Add each banned member's info with reason
+                for username, ban_info in bans_data.items():
+                    ban_reason = ban_info.get("ban_reason", "No reason provided.")
+                    user_id = ban_info.get("user_id", "Unknown ID")
+                    user_mention = f"<@{user_id}>"  # Add user mention here
+
+                    # Format each banned member's entry without the "Banned By" field
+                    embed.add_field(
+                        name=f"**{username}**",
+                        value=f"Mention: {user_mention} | User ID: `{user_id}`\n"
+                              f"Reason: {ban_reason}",
+                        inline=False
+                    )
+
+                # Send the embed message
+                await ctx.send(embed=embed)
+            else:
                 await ctx.send("No members are currently banned.")
-                return
-
-            # Create the embed
-            embed = Embed(title="**Banned Members List**", color=nextcord.Color.red())
-
-            # Add each banned member's info with reason
-            for username, ban_info in bans_data.items():
-                ban_reason = ban_info.get("ban_reason", "No reason provided.")
-                user_id = ban_info.get("user_id", "Unknown ID")
-                user_mention = f"<@{user_id}>"  # Add user mention here
-
-                # Format each banned member's entry without the "Banned By" field
-                embed.add_field(
-                    name=f"**{username}**",
-                    value=f"Mention: {user_mention} | User ID: `{user_id}`\n"
-                        f"Reason: {ban_reason}",
-                    inline=False
-                )
+        except Exception as e:
+            await ctx.send(f"An error occurred while fetching the ban list: {e}")
 
             # Send the embed message
             await ctx.send(embed=embed)
