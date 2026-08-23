@@ -526,7 +526,7 @@ async def banlist(ctx):
                     embed.add_field(
                         name=f"**{username}**",
                         value=f"Mention: {user_mention} | User ID: `{user_id}`\n"
-                              f"Reason: {ban_reason}",
+                            f"Reason: {ban_reason}",
                         inline=False
                     )
 
@@ -536,13 +536,6 @@ async def banlist(ctx):
                 await ctx.send("No members are currently banned.")
         except Exception as e:
             await ctx.send(f"An error occurred while fetching the ban list: {e}")
-
-            # Send the embed message
-            await ctx.send(embed=embed)
-        else:
-            await ctx.send("No members are currently banned.")
-    except Exception as e:
-        await ctx.send(f"An error occurred while fetching the ban list: {e}")
 
 # Command: Kick a member
 @bot.slash_command(description="Kick a member from the server.")
