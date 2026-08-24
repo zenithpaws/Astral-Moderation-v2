@@ -3,8 +3,9 @@ import sys
 from aiohttp import web
 import nextcord
 import firebase_admin
+import datetime
 from nextcord import SlashOption, Embed
-from nextcord.ext import commands
+from nextcord.ext import commands, tasks
 from firebase_admin import credentials, firestore
 from enum import Enum
 
@@ -409,12 +410,56 @@ async def log_events(ctx, message):
 class ApplicationCommandOptionType(Enum):
     STRING = 3
 
-# Event: When the bot is ready
+# 1. Define the loop FIRST so Python knows it exists!
+utc_midnight = datetime.time(hour=0, minute=0, tzinfo=datetime.timezone.utc)
+
+@tasks.loop(time=utc_midnight)
+async def check_birthdays():
+    """Checks for birthdays every day at exactly UTC midnight."""
+    await bot.wait_until_ready()
+    
+    # Grab the announcement channel ID from Firebase
+    channel_id_str = await get_channel_id("announcement_channel")
+    if not channel_id_str:
+        return # Nowhere to send it!
+        
+    announcement_channel = bot.get_channel(int(channel_id_str))
+    if not announcement_channel:
+        return
+
+    try:
+        birthdays_ref = db.collection("data").document("birthdays")
+        birthdays_doc = birthdays_ref.get()
+        
+        if not birthdays_doc.exists:
+            return
+            
+        birthdays_data = birthdays_doc.to_dict()
+        
+        # Get the current date in UTC
+        today_utc = datetime.datetime.now(datetime.timezone.utc)
+        
+        # Loop through all saved birthdays
+        for user_id, info in birthdays_data.items():
+            bday_timestamp = info.get("date")
+            
+            if bday_timestamp:
+                # Check if today's UTC month and day match the stored month and day
+                if bday_timestamp.month == today_utc.month and bday_timestamp.day == today_utc.day:
+                    await announcement_channel.send(f"🎉 Happy Birthday <@{user_id}>! @everyone, let's wish them an absolutely pawsome birthday! 🐾🎂")
+                    
+    except Exception as e:
+        print(f"Error checking birthdays: {e}")
+
 @bot.event
 async def on_ready():
     print(f'{bot.user} is now online')
     await bot.change_presence(status=nextcord.Status.online)
     await start_web_server()  # Launch web server for Railway health checks
+    
+    # Start the birthday checker if it isn't already running!
+    if not check_birthdays.is_running():
+        check_birthdays.start()
 
 # Command: Ban a member
 @bot.slash_command(description="Ban a member from the server.")
@@ -501,41 +546,40 @@ async def unban(ctx, *, member):
 @bot.slash_command(description="List banned members and their reasons.")
 async def banlist(ctx):
     """List banned members and their ban reasons from Firebase."""
-    if await permission_check(ctx):
-        try:
-            # Fetch the 'bans' document from the 'data' collection
-            bans_ref = db.collection("data").document("bans")
-            bans_doc = bans_ref.get()
+    try:
+        # Fetch the 'bans' document from the 'data' collection
+        bans_ref = db.collection("data").document("bans")
+        bans_doc = bans_ref.get()
 
-            if bans_doc.exists:
-                bans_data = bans_doc.to_dict()
-                if not bans_data:
-                    await ctx.send("No members are currently banned.")
-                    return
-
-                # Create the embed
-                embed = Embed(title="**Banned Members List**", color=nextcord.Color.red())
-
-                # Add each banned member's info with reason
-                for username, ban_info in bans_data.items():
-                    ban_reason = ban_info.get("ban_reason", "No reason provided.")
-                    user_id = ban_info.get("user_id", "Unknown ID")
-                    user_mention = f"<@{user_id}>"  # Add user mention here
-
-                    # Format each banned member's entry without the "Banned By" field
-                    embed.add_field(
-                        name=f"**{username}**",
-                        value=f"Mention: {user_mention} | User ID: `{user_id}`\n"
-                            f"Reason: {ban_reason}",
-                        inline=False
-                    )
-
-                # Send the embed message
-                await ctx.send(embed=embed)
-            else:
+        if bans_doc.exists:
+            bans_data = bans_doc.to_dict()
+            if not bans_data:
                 await ctx.send("No members are currently banned.")
-        except Exception as e:
-            await ctx.send(f"An error occurred while fetching the ban list: {e}")
+                return
+
+            # Create the embed
+            embed = Embed(title="**Banned Members List**", color=nextcord.Color.red())
+
+            # Add each banned member's info with reason
+            for username, ban_info in bans_data.items():
+                ban_reason = ban_info.get("ban_reason", "No reason provided.")
+                user_id = ban_info.get("user_id", "Unknown ID")
+                user_mention = f"<@{user_id}>"  # Add user mention here
+
+                # Format each banned member's entry without the "Banned By" field
+                embed.add_field(
+                    name=f"**{username}**",
+                    value=f"Mention: {user_mention} | User ID: `{user_id}`\n"
+                        f"Reason: {ban_reason}",
+                    inline=False
+                )
+
+            # Send the embed message
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("No members are currently banned.")
+    except Exception as e:
+        await ctx.send(f"An error occurred while fetching the ban list: {e}")
 
 # Command: Kick a member
 @bot.slash_command(description="Kick a member from the server.")
@@ -1078,6 +1122,117 @@ async def databasestatus(ctx):
             print(f"Error retriving database status: {e}")
             await ctx.send(f"❌ Failed to retrieve database status: `{e}`")
 
+# Command: Set Birthday
+@bot.slash_command(description="Set your birthday for automatic server announcements!")
+async def birthday(
+    ctx, 
+    month: int = SlashOption(description="Month of your birth (1-12)", min_value=1, max_value=12),
+    day: int = SlashOption(description="Day of your birth (1-31)", min_value=1, max_value=31),
+    year: int = SlashOption(description="Year of your birth (e.g. 2009)", min_value=1900)
+):
+    """Set your birthday to receive a special shoutout!"""
+    # 🐾 Tell Discord we need a second to talk to Firebase!
+    await ctx.response.defer()
+
+    # 1. Force the datetime object to exactly 00:00:00 UTC
+    try:
+        bday_dt = datetime.datetime(year, month, day, tzinfo=datetime.timezone.utc)
+    except ValueError:
+        await ctx.send("That date doesn't seem quite right! Check your month and day. owo")
+        return
+
+    # 2. Prepare the data mapping using the user's ID
+    user_id_str = str(ctx.user.id)
+    birthday_data = {
+        user_id_str: {
+            "username": ctx.user.name,
+            "date": bday_dt
+        }
+    }
+
+    # 3. Store it in Firestore
+    try:
+        birthdays_ref = db.collection("data").document("birthdays")
+        birthdays_ref.set(birthday_data, merge=True)
+        
+        await ctx.send(f"Yay! Your birthday has been securely saved as {month}/{day}/{year}! :tada:")
+    except Exception as e:
+        print(f"Error saving birthday for {ctx.user.name}: {e}")
+        await ctx.send("Oh no, something went wrong saving your birthday to the database. :(")
+
+# Command: List all birthdays and today's birthdays
+@bot.slash_command(description="List today's birthdays and all stored server birthdays! :3")
+async def birthdays(ctx):
+    """Check all the upcoming birthdays!"""
+    # 🐾 Tell Discord we're fetching the list!
+    await ctx.response.defer()
+    
+    try:
+        birthdays_ref = db.collection("data").document("birthdays")
+        birthdays_doc = birthdays_ref.get()
+
+        if not birthdays_doc.exists or not birthdays_doc.to_dict():
+            await ctx.send("Nobody has set up their birthday yet! owo")
+            return
+
+        birthdays_data = birthdays_doc.to_dict()
+        today_utc = datetime.datetime.now(datetime.timezone.utc)
+        
+        today_peeps = []
+        all_peeps = []
+
+        # Convert to a list so we can sort it cleanly by date
+        bday_list = []
+        for user_id, info in birthdays_data.items():
+            bday_timestamp = info.get("date")
+            username = info.get("username", "Unknown User")
+            
+            if bday_timestamp:
+                bday_list.append({
+                    "user_id": user_id,
+                    "username": username,
+                    "month": bday_timestamp.month,
+                    "day": bday_timestamp.day,
+                    "year": bday_timestamp.year
+                })
+
+        # Sort the list by month, then by day!
+        bday_list.sort(key=lambda x: (x["month"], x["day"]))
+
+        # Build our formatted lists
+        for bday in bday_list:
+            # Format for the master list
+            formatted_bday = f"🗓️ `{bday['month']}/{bday['day']}/{bday['year']}` - <@{bday['user_id']}>"
+            all_peeps.append(formatted_bday)
+            
+            # Check if it's their special day today
+            if bday["month"] == today_utc.month and bday["day"] == today_utc.day:
+                today_peeps.append(f"🎉 <@{bday['user_id']}> (`{bday['username']}`)")
+
+        # Build the festive embed!
+        embed = Embed(title="🎂 Server Birthdays! 🎂", color=nextcord.Color.gold())
+        
+        # 1. Today's Birthdays Field
+        if today_peeps:
+            embed.add_field(name="🎁 Today's Birthdays!", value="\n".join(today_peeps), inline=False)
+        else:
+            embed.add_field(name="🎁 Today's Birthdays!", value="No birthdays today. *sad puppy noises*", inline=False)
+            
+        # 2. All Birthdays Field
+        all_bday_text = "\n".join(all_peeps)
+        
+        # Discord limits embed fields to 1024 characters, so we chunk it just in case your server gets huge!
+        if len(all_bday_text) > 1024:
+            all_bday_text = all_bday_text[:1020] + "..."
+            
+        embed.add_field(name="📅 All Stored Birthdays", value=all_bday_text, inline=False)
+        
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        print(f"Error fetching birthdays: {e}")
+        await ctx.send(f"Oh no, an error occurred while fetching the birthday list: `{e}`")
+
 # Command: Show help information.
 @bot.slash_command(description="Show help information.")
 async def help(ctx):
@@ -1122,6 +1277,8 @@ async def help(ctx):
 - `/invite` | Get server invite link.
 - `/botinvite` | Get bot invite link
 - `/databasestats` - Check live Firestore document counts, estimated storage usage, and free plan limits.
+- `/birthday` - Sets up the birthday announcement for the user running the command.
+- `/birthdays` - List everyone's birthday
 
 **General Commands:**
 - `/help` | Show help information.""")
